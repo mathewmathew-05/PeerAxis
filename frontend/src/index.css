@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Color Palette - Ocean Blue + Teal (Trust, Growth, Education) */
+    --background: 210 25% 98%;
+    --foreground: 222 47% 11%;
+    
+    /* Primary: Ocean Blue */
+    --primary: 212 84% 48%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 212 84% 65%;
+    --primary-dark: 212 84% 38%;
+    
+    /* Secondary: Teal/Emerald */
+    --secondary: 167 72% 46%;
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Accent: Warm Orange (Energy, Motivation) */
+    --accent: 25 95% 58%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Success: Green */
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning: Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* UI Elements */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --muted: 210 25% 96%;
+    --muted-foreground: 215 16% 47%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 212 84% 48%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Chart Colors */
+    --chart-1: 212 84% 48%;
+    --chart-2: 167 72% 46%;
+    --chart-3: 25 95% 58%;
+    --chart-4: 142 76% 45%;
+    --chart-5: 271 91% 65%;
+    
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(212 84% 48%) 0%, hsl(167 72% 46%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(212 84% 48% / 0.05) 0%, hsl(167 72% 46% / 0.05) 100%);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.08), 0 2px 4px -1px hsl(222 47% 11% / 0.04);
+    --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.08), 0 4px 6px -2px hsl(222 47% 11% / 0.03);
+    --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.1), 0 10px 10px -5px hsl(222 47% 11% / 0.04);
+    
+    /* Border Radius */
+    --radius: 0.75rem;
+    
+    /* Transitions */
+    --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+  
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 25% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 25% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 25% 98%;
+    --primary: 212 84% 55%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 167 72% 50%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 215 30% 15%;
+    --muted-foreground: 215 16% 65%;
+    --accent: 25 95% 62%;
+    --accent-foreground: 222 47% 11%;
+    --border: 215 30% 18%;
+    --input: 215 30% 18%;
+    --ring: 212 84% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+  }
+  
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  }
+}
+
+@layer utilities {
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+  
+  .shadow-elegant {
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .transition-smooth {
+    transition: all var(--transition-smooth);
+  }
+  
+  .transition-bounce {
+    transition: all var(--transition-bounce);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.4s ease-out forwards;
+}
+
+/* React Big Calendar custom styles */
+.rbc-calendar {
+  font-family: 'Inter', sans-serif;
+}
+
+.rbc-header {
+  padding: 12px 6px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.rbc-today {
+  background-color: hsl(var(--primary) / 0.05);
+}
+
+.rbc-event {
+  background-color: hsl(var(--primary));
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 0.8125rem;
+}
+
+.rbc-event.rbc-selected {
+  background-color: hsl(var(--primary-dark));
+}
+
+.rbc-toolbar button {
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--border));
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.rbc-toolbar button:hover,
+.rbc-toolbar button:focus {
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--primary));
+  outline: none;
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-color: hsl(var(--primary));
+}
