@@ -1,93 +1,104 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# IDE and editors
+# ======================
+# IDE / Editors
+# ======================
 .idea/
 .vscode/
 
+# ======================
 # Dependencies
+# ======================
 node_modules/
-/node_modules
-/.pnp
+**/node_modules/
+
+.pnp
 .pnp.js
-.yarn/install-state.gz
+
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.yarn/install-state.gz
 
-# Testing
-/coverage
+# ======================
+# Build Outputs
+# ======================
+build/
+dist/
+**/build/
+**/dist/
 
-# Next.js
-/.next/
-/out/
+# Next.js (safe even if unused)
+.next/
+out/
 next-env.d.ts
 *.tsbuildinfo
 
-# Production builds
-/build
-dist/
-dist
-
-# Environment files (comprehensive coverage)
+# ======================
+# Environment Variables
+# ======================
+.env
+.env.*
+*.env
+*.env.*
 
 *token.json*
 *credentials.json*
+*.pem
 
-# Logs and debug files
+# ======================
+# Logs & Debug
+# ======================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 dump.rdb
 
-# System files
-.DS_Store
-*.pem
+# ======================
+# Testing
+# ======================
+coverage/
 
-# Python
+# ======================
+# OS Files
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Python (safe to keep)
+# ======================
 __pycache__/
-*pyc*
+*.pyc
 venv/
 .venv/
 
-# Development tools
-chainlit.md
-.chainlit
-.ipynb_checkpoints/
-.ac
+# ======================
+# Caches
+# ======================
+.cache/
+**/.cache/
 
+# ======================
 # Deployment
-.vercel
+# ======================
+.vercel/
 
-# Data and databases
-agenthub/agents/youtube/db
+# ======================
+# Jupyter / Dev Tools
+# ======================
+.ipynb_checkpoints/
+.chainlit
+chainlit.md
 
-# Archive files and large assets
-**/*.zip
-**/*.tar.gz
-**/*.tar
-**/*.tgz
+# ======================
+# Archives / Large Files
+# ======================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
 *.pack
 *.deb
 *.dylib
-
-# Build caches
-.cache/
-
-# Mobile development
-android-sdk/ frontend/node_modules/.cache/default-development/5.pack_
-frontend/node_modules/.cache/default-development/5.pack
-frontend/node_modules/.cache/default-development/1.pack
-frontend/node_modules/.cache/default-development/3.pack
--e 
-# Environment files
-*.env
-*.env.*
-frontend/node_modules/.cache/default-development/2.pack
-frontend/node_modules/.cache/default-development/0.pack
--e 
-# Environment files
-*.env
-*.env.*
