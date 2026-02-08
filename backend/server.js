@@ -42,6 +42,9 @@ app.use("/api/sessions", sessionRoutes);
 const notificationRoutes = require("./routes/notifications");
 app.use("/api/notifications", notificationRoutes);
 
+const goalsRoutes=require("./routes/goals");
+app.use("/api/goals",goalsRoutes);
+
 const PORT=5000;
 app.listen(PORT,()=>{
     console.log(`Server running on port ${PORT}`);
