@@ -39,13 +39,6 @@ const LandingPage = () => {
     }
   ];
 
-  const stats = [
-    { value: '500+', label: 'Active Mentors' },
-    { value: '1,200+', label: 'Students Mentored' },
-    { value: '3,500+', label: 'Sessions Completed' },
-    { value: '4.8/5', label: 'Average Rating' }
-  ];
-
   const benefits = [
     'Connect with experienced seniors',
     'Personalized learning paths',
@@ -82,7 +75,7 @@ const LandingPage = () => {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/5" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-32 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -109,23 +102,6 @@ const LandingPage = () => {
                 </Button>
               </Link>
             </div>
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-20"
-          >
-            {stats.map((stat, index) => (
-              <Card key={index} className="border-border bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 text-center">
-                  <p className="text-3xl font-display font-bold text-primary mb-1">{stat.value}</p>
-                  <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
-                </CardContent>
-              </Card>
-            ))}
           </motion.div>
         </div>
       </section>
@@ -221,7 +197,7 @@ const LandingPage = () => {
             Ready to Transform Your Learning Experience?
           </h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Join thousands of students who are already benefiting from peer mentoring.
+            Join students who are already benefiting from peer mentoring on PeerAxis.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/register">

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 
 const LoginPage = () => {
-  const { login, user } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -18,8 +18,6 @@ const LoginPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already logged in
- 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -32,7 +30,7 @@ const LoginPage = () => {
       navigate('/dashboard');
     } catch (error) {
       toast.error('Login failed', {
-        description: 'Please check your credentials and try again.'
+        description: error.message || 'Please check your credentials and try again.'
       });
     } finally {
       setIsLoading(false);
@@ -44,24 +42,6 @@ const LoginPage = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
-  };
-
-  const quickLogin = (role) => {
-    let email = '';
-    switch (role) {
-      case 'mentee':
-        email = 'mentee@example.com';
-        break;
-      case 'mentor':
-        email = 'mentor@example.com';
-        break;
-      case 'admin':
-        email = 'admin@example.com';
-        break;
-      default:
-        email = 'mentee@example.com';
-    }
-    setFormData({ email, password: 'password123' });
   };
 
   return (
@@ -154,7 +134,7 @@ const LoginPage = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="password">Password</Label>
-                    <Link to="#" className="text-sm text-primary hover:underline">
+                    <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -186,47 +166,6 @@ const LoginPage = () => {
                   )}
                 </Button>
               </form>
-
-              {/* Quick Login Options */}
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Quick Login (Demo)</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => quickLogin('mentee')}
-                    className="text-xs"
-                  >
-                    Mentee
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => quickLogin('mentor')}
-                    className="text-xs"
-                  >
-                    Mentor
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => quickLogin('admin')}
-                    className="text-xs"
-                  >
-                    Admin
-                  </Button>
-                </div>
-              </div>
             </CardContent>
             <CardFooter>
               <p className="text-sm text-center text-muted-foreground w-full">
