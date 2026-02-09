@@ -309,6 +309,7 @@ router.put("/milestones/:milestoneId", async (req, res) => {
   const { title, description, due_date, completed } = req.body;
 
   try {
+    // Update the milestone
     const result = await pool.query(
       `UPDATE goal_milestones
        SET title = COALESCE($1, title),
@@ -330,9 +331,47 @@ router.put("/milestones/:milestoneId", async (req, res) => {
       return res.status(404).json({ error: "Milestone not found" });
     }
 
+    // 🆕 AUTO-CALCULATE PROGRESS
+    const milestone = result.rows[0];
+    const goalId = milestone.goal_id;
+
+    // Count total and completed milestones
+    const progressResult = await pool.query(
+      `SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE completed = true) as completed
+       FROM goal_milestones 
+       WHERE goal_id = $1`,
+      [goalId]
+    );
+
+    const { total, completed: completedCount } = progressResult.rows[0];
+    const progress = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+
+    // Update goal progress
+    await pool.query(
+      `UPDATE goals 
+       SET progress = $1, 
+           updated_at = NOW()
+       WHERE goal_id = $2`,
+      [progress, goalId]
+    );
+
+    // 🆕 Auto-complete goal if all milestones done
+    if (progress === 100) {
+      await pool.query(
+        `UPDATE goals 
+         SET status = 'completed', 
+             completed_at = NOW()
+         WHERE goal_id = $1 AND status != 'completed'`,
+        [goalId]
+      );
+    }
+
     res.json({
       message: "Milestone updated successfully",
-      milestone: result.rows[0]
+      milestone: result.rows[0],
+      progress: progress  // Return new progress
     });
   } catch (err) {
     console.error("Error updating milestone:", err);
