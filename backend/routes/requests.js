@@ -12,7 +12,7 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // Check if request already exists
+    // Check if there's already a pending request
     const existingRequest = await pool.query(
       `SELECT * FROM mentoring_requests 
        WHERE mentee_id = $1 AND mentor_id = $2 AND status = 'pending'`,
@@ -22,6 +22,27 @@ router.post("/", async (req, res) => {
     if (existingRequest.rows.length > 0) {
       return res.status(400).json({ 
         error: "You already have a pending request with this mentor" 
+      });
+    }
+
+    // Check if there's an accepted request with a scheduled session
+    const acceptedRequest = await pool.query(
+      `SELECT r.* FROM mentoring_requests r
+       WHERE r.mentee_id = $1 
+       AND r.mentor_id = $2 
+       AND r.status = 'accepted'
+       AND EXISTS (
+         SELECT 1 FROM sessions s 
+         WHERE s.mentee_id = $1 
+         AND s.mentor_id = $2 
+         AND s.status = 'scheduled'
+       )`,
+      [mentee_id, mentor_id]
+    );
+
+    if (acceptedRequest.rows.length > 0) {
+      return res.status(400).json({ 
+        error: "You already have an active session scheduled with this mentor" 
       });
     }
 
@@ -52,6 +73,14 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating request:", err);
+    
+    // Handle unique constraint violation (error code 23505)
+    if (err.code === '23505') {
+      return res.status(400).json({ 
+        error: "You already have a pending request with this mentor" 
+      });
+    }
+    
     res.status(500).json({ error: err.message });
   }
 });
@@ -175,5 +204,65 @@ router.delete("/:requestId", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Add this endpoint to your requests.js file temporarily for debugging
 
+// DIAGNOSTIC: Check request status for a specific mentee-mentor pair
+router.get("/debug/:menteeId/:mentorId", async (req, res) => {
+  const { menteeId, mentorId } = req.params;
+
+  try {
+    // Get ALL requests between this pair (not just pending)
+    const allRequests = await pool.query(
+      `SELECT * FROM mentoring_requests 
+       WHERE mentee_id = $1 AND mentor_id = $2
+       ORDER BY created_at DESC`,
+      [menteeId, mentorId]
+    );
+
+    // Get pending requests specifically
+    const pendingRequests = await pool.query(
+      `SELECT * FROM mentoring_requests 
+       WHERE mentee_id = $1 AND mentor_id = $2 AND status = 'pending'`,
+      [menteeId, mentorId]
+    );
+
+    // Get accepted requests
+    const acceptedRequests = await pool.query(
+      `SELECT * FROM mentoring_requests 
+       WHERE mentee_id = $1 AND mentor_id = $2 AND status = 'accepted'`,
+      [menteeId, mentorId]
+    );
+
+    // Get sessions
+    const sessions = await pool.query(
+      `SELECT * FROM sessions 
+       WHERE mentee_id = $1 AND mentor_id = $2
+       ORDER BY created_at DESC`,
+      [menteeId, mentorId]
+    );
+
+    res.json({
+      menteeId,
+      mentorId,
+      summary: {
+        totalRequests: allRequests.rows.length,
+        pendingCount: pendingRequests.rows.length,
+        acceptedCount: acceptedRequests.rows.length,
+        sessionCount: sessions.rows.length
+      },
+      allRequests: allRequests.rows,
+      pendingRequests: pendingRequests.rows,
+      acceptedRequests: acceptedRequests.rows,
+      sessions: sessions.rows,
+      recommendation: pendingRequests.rows.length > 0 
+        ? "Cannot send request - pending request exists"
+        : acceptedRequests.rows.length > 0 && sessions.rows.some(s => s.status === 'scheduled')
+        ? "Cannot send request - active session exists"
+        : "Can send request"
+    });
+  } catch (err) {
+    console.error("Debug endpoint error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;

@@ -85,44 +85,95 @@ const FindMentorPage = () => {
       );
       const sessionsData = await sessionsRes.json();
 
-      console.log('📋 Requests:', requestsData.sent);
-      console.log('📅 Sessions:', sessionsData);
+      console.log('📋 Raw Requests Response:', requestsData);
+      console.log('📅 Raw Sessions Response:', sessionsData);
+
+      // 🔥 FIX: Handle different API response formats
+      let sentRequests = [];
+      if (Array.isArray(requestsData)) {
+        // If API returns array directly: [{ request_id, ... }, ...]
+        sentRequests = requestsData;
+      } else if (requestsData && requestsData.sent && Array.isArray(requestsData.sent)) {
+        // If API returns object: { sent: [...], received: [...] }
+        sentRequests = requestsData.sent;
+      } else if (requestsData && requestsData.requests && Array.isArray(requestsData.requests)) {
+        // If API returns object: { requests: [...] }
+        sentRequests = requestsData.requests;
+      }
+
+      let sessions = [];
+      if (Array.isArray(sessionsData)) {
+        // If API returns array directly
+        sessions = sessionsData;
+      } else if (sessionsData && sessionsData.sessions && Array.isArray(sessionsData.sessions)) {
+        // If API returns object: { sessions: [...] }
+        sessions = sessionsData.sessions;
+      }
+
+      console.log('📋 Parsed Sent Requests:', sentRequests);
+      console.log('📅 Parsed Sessions:', sessions);
 
       // Build status map
       const statusMap = {};
 
-      requestsData.sent?.forEach(request => {
-        const mentorId = request.mentor_id;
+      // Safely iterate with forEach
+      if (sentRequests && sentRequests.length > 0) {
+       sentRequests.forEach(request => {
+  const mentorId = String(request.mentor_id);
+  const status = request.status?.toLowerCase();
 
-        if (request.status === 'pending') {
-          // Pending request
-          statusMap[mentorId] = { type: 'pending' };
-        } 
-        else if (request.status === 'accepted') {
-          // Check if there's an ACTIVE (scheduled) session with this mentor
-          const activeSession = sessionsData.find(
-            s => s.mentor_id === mentorId && s.status === 'scheduled'
-          );
+  console.log(`📝 Processing request for mentor ${mentorId}:`, {
+    request_id: request.request_id,
+    status: status,
+    mentor_id: mentorId
+  });
 
-          if (activeSession) {
-            // Has active session - show "View Session"
-            statusMap[mentorId] = { 
-              type: 'active_session', 
-              sessionId: activeSession.session_id 
-            };
-          } else {
-            // Request accepted BUT no active session (cancelled/completed)
-            // Allow new request
-            statusMap[mentorId] = { type: 'can_request' };
-          }
-        }
-        // If declined or any other status, allow new request (no entry in map)
-      });
+  // CRITICAL FIX: Don't overwrite 'pending' status with anything else!
+  // If this mentor already has 'pending' status, skip this request
+  if (statusMap[mentorId]?.type === 'pending') {
+    console.log(`⏭️ Skipping - already marked as PENDING`);
+    return;
+  }
+
+  if (status === 'pending') {
+    console.log(`⏳ Setting ${mentorId} to PENDING`);
+    statusMap[mentorId] = { type: 'pending', requestId: request.request_id };
+  } 
+  else if (status === 'accepted') {
+    // Also don't overwrite active_session
+    if (statusMap[mentorId]?.type === 'active_session') {
+      console.log(`⏭️ Skipping - already marked as ACTIVE_SESSION`);
+      return;
+    }
+
+    const activeSession = sessions.find(
+      s => String(s.mentor_id) === mentorId && s.status?.toLowerCase() === 'scheduled'
+    );
+
+    if (activeSession) {
+      console.log(`📅 Setting ${mentorId} to ACTIVE_SESSION`);
+      statusMap[mentorId] = { 
+        type: 'active_session', 
+        sessionId: activeSession.session_id,
+        requestId: request.request_id
+      };
+    } else {
+      console.log(`✅ Setting ${mentorId} to CAN_REQUEST (accepted but no scheduled session)`);
+      statusMap[mentorId] = { type: 'can_request' };
+    }
+  } else {
+    console.log(`❓ Request status "${status}" - not tracked in statusMap`);
+  }
+});
+
+      }
 
       console.log('🗺️ Mentor Status Map:', statusMap);
       setMentorStatus(statusMap);
     } catch (err) {
       console.error("Error fetching mentor statuses:", err);
+      // Set empty object so UI doesn't crash
+      setMentorStatus({});
     }
   };
 
@@ -173,6 +224,69 @@ const FindMentorPage = () => {
     setIsSending(true);
 
     try {
+      // CRITICAL: Do a fresh server-side check RIGHT before sending
+      console.log('🔄 Doing pre-flight check...');
+      const preflightRes = await fetch(
+        `http://localhost:5000/api/requests/user/${user.user_id}`
+      );
+      const preflightData = await preflightRes.json();
+      
+      let currentSentRequests = [];
+      if (Array.isArray(preflightData)) {
+        currentSentRequests = preflightData;
+      } else if (preflightData.sent) {
+        currentSentRequests = preflightData.sent;
+      }
+      
+      // Check if there's already a pending request for this mentor
+      const existingPending = currentSentRequests.find(
+        r => String(r.mentor_id) === String(selectedMentor.mentor_id) && 
+             r.status?.toLowerCase() === 'pending'
+      );
+      
+      if (existingPending) {
+        console.log('⚠️ Pre-flight check found existing pending request:', existingPending);
+        toast.error("Request already exists", {
+          description: "You already have a pending request with this mentor"
+        });
+        setIsDialogOpen(false);
+        fetchMentorStatuses(); // Refresh to update UI
+        return;
+      }
+      
+      // Also check for active sessions
+      const sessionsRes = await fetch(
+        `http://localhost:5000/api/sessions/user/${user.user_id}`
+      );
+      const sessionsData = await sessionsRes.json();
+      
+      let currentSessions = [];
+      if (Array.isArray(sessionsData)) {
+        currentSessions = sessionsData;
+      }
+      
+      const activeSession = currentSessions.find(
+        s => String(s.mentor_id) === String(selectedMentor.mentor_id) && 
+             s.status?.toLowerCase() === 'scheduled'
+      );
+      
+      if (activeSession) {
+        console.log('⚠️ Pre-flight check found active session:', activeSession);
+        toast.error("Active session exists", {
+          description: "You already have a scheduled session with this mentor"
+        });
+        setIsDialogOpen(false);
+        navigate(`/sessions/${activeSession.session_id}`);
+        return;
+      }
+
+      console.log('✅ Pre-flight check passed - no conflicts found');
+      console.log('📤 Sending request:', {
+        mentee_id: user.user_id,
+        mentor_id: selectedMentor.mentor_id,
+        message: requestMessage,
+      });
+
       const res = await fetch("http://localhost:5000/api/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,6 +298,7 @@ const FindMentorPage = () => {
       });
 
       const data = await res.json();
+      console.log('📥 Response:', { status: res.status, data });
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to send request");
@@ -202,7 +317,11 @@ const FindMentorPage = () => {
       setIsDialogOpen(false);
       setSelectedMentor(null);
       setRequestMessage("");
+
+      // Refresh from server
+      fetchMentorStatuses();
     } catch (err) {
+      console.error('❌ Request failed:', err);
       toast.error("Failed to send request", {
         description: err.message,
       });
@@ -212,6 +331,24 @@ const FindMentorPage = () => {
   };
 
   const openRequestDialog = (mentor) => {
+    // Double-check status before opening dialog
+    const status = mentorStatus[mentor.mentor_id];
+    
+    if (status?.type === 'pending') {
+      toast.error("Request already pending", {
+        description: "You already have a pending request with this mentor"
+      });
+      return;
+    }
+    
+    if (status?.type === 'active_session') {
+      toast.error("Active session exists", {
+        description: "You already have a scheduled session with this mentor"
+      });
+      navigate(`/sessions/${status.sessionId}`);
+      return;
+    }
+    
     setSelectedMentor(mentor);
     setIsDialogOpen(true);
   };
@@ -265,6 +402,12 @@ const FindMentorPage = () => {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMentors.map((mentor) => {
           const status = mentorStatus[mentor.mentor_id];
+          
+          // DEBUG: Log the status for each mentor
+          console.log(`🎯 Mentor ${mentor.name} (${mentor.mentor_id}):`, {
+            status,
+            allStatuses: mentorStatus
+          });
           
           // Determine button type
           const isPending = status?.type === 'pending';
