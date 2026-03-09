@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext } from "react";
+import api from "../lib/api";
 import { USER_ROLES } from "../types";
 
 const AuthContext = createContext(null);
@@ -29,15 +30,8 @@ export const AuthProvider = ({ children }) => {
 
       try {
         // Always fetch latest user from DB
-        const response = await fetch(
-          `http://localhost:5000/api/users/${parsedUser.user_id}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user");
-        }
-
-        const data = await response.json();
+        const response = await api.get(`/users/${parsedUser.user_id}`);
+        const data = response.data;
 
         setUser(data.user);
         localStorage.setItem(
@@ -60,35 +54,19 @@ export const AuthProvider = ({ children }) => {
   // LOGIN
   // -------------------------------
   const login = async (email, password) => {
-    setIsLoading(true);
-
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+      const res = await api.post("/auth/login", { email, password });
 
-      const data = await response.json();
+      const { user, token } = res.data;
+      const userWithToken = { ...user, token };
 
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
-      }
+      setUser(userWithToken);
+      localStorage.setItem("mentoring_user", JSON.stringify(userWithToken));
 
-      setUser(data.user);
-      localStorage.setItem(
-        "mentoring_user",
-        JSON.stringify(data.user)
-      );
-
-      return data.user;
-    } finally {
-      setIsLoading(false);
+      return userWithToken;
+    } catch (err) {
+      console.error("Login failed:", err);
+      throw err;
     }
   };
 
@@ -96,38 +74,19 @@ export const AuthProvider = ({ children }) => {
   // REGISTER
   // -------------------------------
   const register = async (userData) => {
-    setIsLoading(true);
-
     try {
-      setUser(null);
-      localStorage.removeItem("mentoring_user");
-      
-      const response = await fetch(
-        "http://localhost:5000/api/auth/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(userData),
-        }
-      );
+      const res = await api.post("/auth/register", userData);
 
-      const data = await response.json();
+      const { user, token } = res.data;
+      const userWithToken = { ...user, token };
 
-      if (!response.ok) {
-        throw new Error(data.error || "Registration failed");
-      }
+      setUser(userWithToken);
+      localStorage.setItem("mentoring_user", JSON.stringify(userWithToken));
 
-      setUser(data.user);
-      localStorage.setItem(
-        "mentoring_user",
-        JSON.stringify(data.user)
-      );
-
-      return data.user;
-    } finally {
-      setIsLoading(false);
+      return userWithToken;
+    } catch (err) {
+      console.error("Registration failed:", err);
+      throw err;
     }
   };
 

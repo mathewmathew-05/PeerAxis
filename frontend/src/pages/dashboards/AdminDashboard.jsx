@@ -1,49 +1,63 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useMockData } from '../../hooks/useMockData';
 import { motion } from 'framer-motion';
 import { Users, Calendar, TrendingUp, Award, Activity, Shield, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
+import api from '../../lib/api';
+import { toast } from 'sonner';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const { sessions, leaderboard } = useMockData(user);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalMentors: 0,
+    totalMentees: 0,
+    activeSessions: 0,
+    avgRating: 0
+  });
+  const [sessionsData, setSessionsData] = useState([]);
+  const [departmentData, setDepartmentData] = useState([]);
+  const [leaderboard, setLeaderboard] = useState([]);
 
-  const totalMentors = 25;
-  const totalMentees = 150;
-  const activeSessions = sessions.filter(s => s.status === 'upcoming').length;
-  const completedSessions = sessions.filter(s => s.status === 'completed').length;
-  const avgRating = 4.6;
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const stats = [
-    { label: 'Total Mentors', value: totalMentors, icon: Users, color: 'text-primary', change: '+12%' },
-    { label: 'Total Mentees', value: totalMentees, icon: Users, color: 'text-secondary', change: '+28%' },
-    { label: 'Active Sessions', value: activeSessions, icon: Calendar, color: 'text-accent', change: '+5%' },
-    { label: 'Avg Rating', value: avgRating.toFixed(1), icon: Award, color: 'text-success', change: '+0.3' }
+  const fetchDashboardData = async () => {
+    try {
+      const [analyticsRes, leaderboardRes] = await Promise.all([
+        api.get('/analytics/admin'),
+        api.get('/analytics/leaderboard')
+      ]);
+
+      setStats(analyticsRes.data.stats);
+      setSessionsData(analyticsRes.data.sessionsData);
+      setDepartmentData(analyticsRes.data.departmentData);
+      setLeaderboard(leaderboardRes.data);
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
+    { label: 'Total Mentors', value: stats.totalMentors, icon: Users, color: 'text-primary' },
+    { label: 'Total Mentees', value: stats.totalMentees, icon: Users, color: 'text-secondary' },
+    { label: 'Active Sessions', value: stats.activeSessions, icon: Calendar, color: 'text-accent' },
+    { label: 'Avg Rating', value: stats.avgRating, icon: Award, color: 'text-success' }
   ];
 
-  // Mock data for charts
-  const sessionsData = [
-    { month: 'Jan', sessions: 45 },
-    { month: 'Feb', sessions: 52 },
-    { month: 'Mar', sessions: 61 },
-    { month: 'Apr', sessions: 58 },
-    { month: 'May', sessions: 70 },
-    { month: 'Jun', sessions: 65 }
-  ];
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--success))', '#8884d8', '#82ca9d'];
 
-  const departmentData = [
-    { name: 'CS', value: 45 },
-    { name: 'IT', value: 30 },
-    { name: 'ECE', value: 15 },
-    { name: 'ME', value: 10 }
-  ];
-
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--success))'];
+  if (loading) {
+    return <div className="p-8 text-center">Loading dashboard...</div>;
+  }
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -55,7 +69,7 @@ const AdminDashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => {
+        {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <motion.div
@@ -70,7 +84,6 @@ const AdminDashboard = () => {
                     <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center ${stat.color}`}>
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-medium text-success">{stat.change}</span>
                   </div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">{stat.label}</p>
                   <p className="text-2xl font-display font-bold">{stat.value}</p>
@@ -155,16 +168,15 @@ const AdminDashboard = () => {
             {leaderboard.slice(0, 5).map((mentor, idx) => (
               <div key={mentor.id} className="flex items-center justify-between p-3 border border-border rounded-lg">
                 <div className="flex items-center space-x-4">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-                    idx === 0 ? 'bg-accent text-accent-foreground' :
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${idx === 0 ? 'bg-accent text-accent-foreground' :
                     idx === 1 ? 'bg-muted text-foreground' :
-                    'bg-muted/50 text-muted-foreground'
-                  }`}>
+                      'bg-muted/50 text-muted-foreground'
+                    }`}>
                     {idx + 1}
                   </div>
                   <div>
                     <p className="font-semibold">{mentor.name}</p>
-                    <p className="text-sm text-muted-foreground">{mentor.department}</p>
+                    <p className="text-sm text-muted-foreground">{mentor.department || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -173,6 +185,9 @@ const AdminDashboard = () => {
                 </div>
               </div>
             ))}
+            {leaderboard.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">No mentor data available yet.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -193,7 +208,7 @@ const AdminDashboard = () => {
             <p className="text-sm text-muted-foreground">Track all mentoring sessions</p>
           </CardContent>
         </Card>
-        <Card className="cursor-pointer hover:border-accent transition-smooth" onClick={() => navigate('/leaderboard')}>
+        <Card className="cursor-pointer hover:border-accent transition-smooth" onClick={() => navigate('/reports')}>
           <CardContent className="p-6">
             <BarChart3 className="w-10 h-10 text-accent mb-3" />
             <h3 className="font-semibold mb-1">View Reports</h3>

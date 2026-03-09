@@ -28,6 +28,7 @@ import ProfilePage from './pages/ProfilePage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import RequestsPage from './pages/RequestsPage';
+import ReportsPage from './pages/ReportsPage';
 
 import { USER_ROLES } from './types';
 
@@ -115,7 +116,7 @@ const App = () => {
             element={
               <PrivateRoute>
                 <DashboardLayout>
-                  <RequestsPage/>
+                  <RequestsPage />
                 </DashboardLayout>
               </PrivateRoute>
             }
@@ -198,6 +199,17 @@ const App = () => {
               </PrivateRoute>
             }
           />
+
+          <Route
+            path="/reports"
+            element={
+              <PrivateRoute allowedRoles={[USER_ROLES.ADMIN]}>
+                <DashboardLayout>
+                  <ReportsPage />
+                </DashboardLayout>
+              </PrivateRoute>
+            }
+          />
         </Routes>
         <Toaster position="top-right" richColors />
       </Router>
@@ -207,9 +219,9 @@ const App = () => {
 
 const DashboardRedirect = () => {
   const { user } = useAuth();
-  
+
   if (!user) return <Navigate to="/login" replace />;
-  
+
   switch (user.role) {
     case USER_ROLES.MENTEE:
       return <Navigate to="/dashboard/mentee" replace />;

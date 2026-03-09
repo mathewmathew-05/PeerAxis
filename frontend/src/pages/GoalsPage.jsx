@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import {
   Target, Plus, Calendar, CheckCircle, AlertCircle, Trash2,
@@ -166,10 +167,8 @@ const GoalsPage = () => {
   const fetchGoals = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/goals/user/${user.user_id}?status=${filterStatus}`
-      );
-      setGoals(await res.json());
+      const res = await api.get(`/goals/user/${user.user_id}?status=${filterStatus}`);
+      setGoals(res.data);
     } catch {
       toast.error('Failed to load goals');
     } finally {
@@ -178,16 +177,14 @@ const GoalsPage = () => {
   };
 
   const fetchStats = async () => {
-    const res = await fetch(
-      `http://localhost:5000/api/goals/user/${user.user_id}/stats`
-    );
-    setStats(await res.json());
+    const res = await api.get(`/goals/user/${user.user_id}/stats`);
+    setStats(res.data);
   };
 
   const loadGoalDetails = async (goalId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/goals/${goalId}`);
-      const data = await res.json();
+      const res = await api.get(`/goals/${goalId}`);
+      const data = res.data;
       console.log('Loaded goal details:', data);
       console.log('Milestones:', data.milestones);
       setSelectedGoal(data);
@@ -229,37 +226,25 @@ const GoalsPage = () => {
 
     try {
       console.log('Creating goal with data:', { ...formData, user_id: user.user_id });
-      
-      const res = await fetch('http://localhost:5000/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, user_id: user.user_id })
-      });
-      
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Backend error:', errorData);
-        throw new Error(errorData.error || 'Failed to create goal');
-      }
-      
-      const result = await res.json();
+
+      console.log('Creating goal with data:', { ...formData, user_id: user.user_id });
+
+      const res = await api.post('/goals', { ...formData, user_id: user.user_id });
+
+      const result = res.data;
       const newGoal = result.goal; // Backend returns { message, goal }
-      
+
       console.log('Created goal:', newGoal);
-      
+
       // Add milestones using correct endpoint
       if (milestones.length > 0) {
         for (const milestone of milestones) {
-          const milestoneRes = await fetch(`http://localhost:5000/api/goals/${newGoal.goal_id}/milestones`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          try {
+            await api.post(`/goals/${newGoal.goal_id}/milestones`, {
               title: milestone.title,
               due_date: milestone.due_date || null
-            })
-          });
-          
-          if (!milestoneRes.ok) {
+            });
+          } catch (err) {
             console.error('Failed to create milestone:', milestone.title);
           }
         }
@@ -267,7 +252,7 @@ const GoalsPage = () => {
       } else {
         toast.success('Goal created! 🎯');
       }
-      
+
       setIsCreateDialogOpen(false);
       resetForm();
       fetchGoals();
@@ -280,14 +265,8 @@ const GoalsPage = () => {
 
   const handleSaveEdit = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/goals/${selectedGoal.goal_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editData)
-      });
-      
-      if (!res.ok) throw new Error('Failed to update goal');
-      
+      await api.put(`/goals/${selectedGoal.goal_id}`, editData);
+
       toast.success('Goal updated! ✅');
       setIsEditMode(false);
       loadGoalDetails(selectedGoal.goal_id);
@@ -300,11 +279,9 @@ const GoalsPage = () => {
 
   const handleDeleteGoal = async (goalId) => {
     if (!window.confirm('Are you sure? This action cannot be undone.')) return;
-    
+
     try {
-      await fetch(`http://localhost:5000/api/goals/${goalId}`, {
-        method: 'DELETE'
-      });
+      await api.delete(`/goals/${goalId}`);
       toast.success('Goal deleted');
       setIsDetailDialogOpen(false);
       fetchGoals();
@@ -316,18 +293,10 @@ const GoalsPage = () => {
 
   const handleToggleMilestone = async (milestoneId, completed) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/goals/milestones/${milestoneId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: completed })
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to update milestone');
-      }
-      
+      await api.put(`/goals/milestones/${milestoneId}/toggle`, { completed: completed });
+
       toast.success(completed ? 'Milestone completed! ✅' : 'Milestone reopened');
-      
+
       // Reload goal to get updated progress
       await loadGoalDetails(selectedGoal.goal_id);
       await fetchGoals();
@@ -340,16 +309,10 @@ const GoalsPage = () => {
 
   const handleDeleteMilestone = async (milestoneId) => {
     if (!window.confirm('Delete this milestone?')) return;
-    
+
     try {
-      const res = await fetch(`http://localhost:5000/api/goals/milestones/${milestoneId}`, {
-        method: 'DELETE'
-      });
-      
-      if (!res.ok) {
-        throw new Error('Failed to delete milestone');
-      }
-      
+      await api.delete(`/goals/milestones/${milestoneId}`);
+
       toast.success('Milestone deleted');
       await loadGoalDetails(selectedGoal.goal_id);
       await fetchGoals();
@@ -367,18 +330,10 @@ const GoalsPage = () => {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/goals/${selectedGoal.goal_id}/milestones`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newExistingGoalMilestone,
-          due_date: newExistingGoalMilestoneDate || null
-        })
+      await api.post(`/goals/${selectedGoal.goal_id}/milestones`, {
+        title: newExistingGoalMilestone,
+        due_date: newExistingGoalMilestoneDate || null
       });
-
-      if (!res.ok) {
-        throw new Error('Failed to add milestone');
-      }
 
       toast.success('Milestone added! ✅');
       setNewExistingGoalMilestone('');
@@ -395,11 +350,7 @@ const GoalsPage = () => {
 
   const handlePauseGoal = async (goalId) => {
     try {
-      await fetch(`http://localhost:5000/api/goals/${goalId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'on_hold' })
-      });
+      await api.put(`/goals/${goalId}`, { status: 'on_hold' });
       toast.success('Goal paused');
       loadGoalDetails(goalId);
       fetchGoals();
@@ -411,11 +362,7 @@ const GoalsPage = () => {
 
   const handleResumeGoal = async (goalId) => {
     try {
-      await fetch(`http://localhost:5000/api/goals/${goalId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' })
-      });
+      await api.put(`/goals/${goalId}`, { status: 'active' });
       toast.success('Goal resumed');
       loadGoalDetails(goalId);
       fetchGoals();
@@ -427,18 +374,14 @@ const GoalsPage = () => {
 
   const handleToggleStatus = async (goalId, newStatus) => {
     try {
-      await fetch(`http://localhost:5000/api/goals/${goalId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
+      await api.put(`/goals/${goalId}/status`, { status: newStatus });
+
       const statusMessages = {
         'active': 'Goal resumed! 🎯',
         'on_hold': 'Goal paused ⏸️',
         'completed': 'Goal completed! 🎉'
       };
-      
+
       toast.success(statusMessages[newStatus] || 'Status updated');
       loadGoalDetails(goalId);
       fetchGoals();
@@ -465,7 +408,7 @@ const GoalsPage = () => {
 
   const addMilestone = () => {
     if (newMilestone.trim()) {
-      setMilestones([...milestones, { 
+      setMilestones([...milestones, {
         title: newMilestone,
         due_date: newMilestoneDate || null
       }]);
@@ -492,12 +435,12 @@ const GoalsPage = () => {
       relevant: template.relevant,
       time_bound: ''
     });
-    
-    setMilestones(template.suggestedMilestones.map(title => ({ 
-      title, 
-      due_date: null 
+
+    setMilestones(template.suggestedMilestones.map(title => ({
+      title,
+      due_date: null
     })));
-    
+
     setIsTemplateDialogOpen(false);
     setIsCreateDialogOpen(true);
     toast.success('Template applied! Customize as needed.');
@@ -580,10 +523,10 @@ const GoalsPage = () => {
 
   const getPriorityColor = (p) =>
     p === 'high' ? 'text-red-500' :
-    p === 'medium' ? 'text-yellow-500' :
-    'text-green-500';
+      p === 'medium' ? 'text-yellow-500' :
+        'text-green-500';
 
-  const getCategoryLabel = (cat) => 
+  const getCategoryLabel = (cat) =>
     cat.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
   /* ---------- GOAL CARD ---------- */
@@ -594,13 +537,12 @@ const GoalsPage = () => {
 
     return (
       <Card
-        onClick={() => { 
-          loadGoalDetails(goal.goal_id); 
-          setIsDetailDialogOpen(true); 
+        onClick={() => {
+          loadGoalDetails(goal.goal_id);
+          setIsDetailDialogOpen(true);
         }}
-        className={`cursor-pointer hover:border-primary transition-all ${
-          isUrgent ? 'border-2 border-red-500' : ''
-        }`}
+        className={`cursor-pointer hover:border-primary transition-all ${isUrgent ? 'border-2 border-red-500' : ''
+          }`}
       >
         <CardContent className="p-6 space-y-4">
           <div className="flex justify-between items-start">
@@ -760,8 +702,8 @@ const GoalsPage = () => {
             </div>
 
             <div className="flex items-end">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
                 className="w-full"
@@ -778,7 +720,7 @@ const GoalsPage = () => {
                 {searchQuery && (
                   <Badge variant="secondary">
                     Search: "{searchQuery}"
-                    <button 
+                    <button
                       onClick={() => setSearchQuery('')}
                       className="ml-2 hover:text-red-500"
                     >×</button>
@@ -787,7 +729,7 @@ const GoalsPage = () => {
                 {categoryFilter !== 'all' && (
                   <Badge variant="secondary">
                     {getCategoryLabel(categoryFilter)}
-                    <button 
+                    <button
                       onClick={() => setCategoryFilter('all')}
                       className="ml-2 hover:text-red-500"
                     >×</button>
@@ -796,7 +738,7 @@ const GoalsPage = () => {
                 {priorityFilter !== 'all' && (
                   <Badge variant="secondary">
                     {priorityFilter.toUpperCase()}
-                    <button 
+                    <button
                       onClick={() => setPriorityFilter('all')}
                       className="ml-2 hover:text-red-500"
                     >×</button>
@@ -842,8 +784,8 @@ const GoalsPage = () => {
                   <>
                     <h3 className="text-xl font-semibold">No {filterStatus} goals yet</h3>
                     <p className="text-muted-foreground mb-4">
-                      {filterStatus === 'active' 
-                        ? 'Create your first goal to get started!' 
+                      {filterStatus === 'active'
+                        ? 'Create your first goal to get started!'
                         : `You don't have any ${filterStatus.replace('_', ' ')} goals.`}
                     </p>
                     {filterStatus === 'active' && (
@@ -886,7 +828,7 @@ const GoalsPage = () => {
           </DialogHeader>
           <div className="grid md:grid-cols-3 gap-4 mt-4">
             {GOAL_TEMPLATES.map(template => (
-              <Card 
+              <Card
                 key={template.id}
                 className="cursor-pointer hover:border-primary transition-all"
                 onClick={() => applyTemplate(template)}
@@ -986,7 +928,7 @@ const GoalsPage = () => {
             {/* SMART Framework */}
             <div className="border rounded-lg p-4 space-y-3">
               <h3 className="font-semibold">SMART Framework</h3>
-              
+
               <div>
                 <Label>Specific *</Label>
                 <Input
@@ -1037,7 +979,7 @@ const GoalsPage = () => {
             {/* Milestones */}
             <div className="border rounded-lg p-4 space-y-3">
               <h3 className="font-semibold">Milestones (Optional)</h3>
-              
+
               <div className="flex gap-2">
                 <div className="flex-1">
                   <Input
@@ -1072,9 +1014,9 @@ const GoalsPage = () => {
                           </span>
                         )}
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => removeMilestone(i)}
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
@@ -1115,13 +1057,13 @@ const GoalsPage = () => {
                       <DialogTitle className="text-2xl">{selectedGoal.title}</DialogTitle>
                     )}
                   </div>
-                  
+
                   <div className="flex gap-2">
                     {!isEditMode ? (
                       <>
                         {selectedGoal.status === 'active' && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handlePauseGoal(selectedGoal.goal_id)}
                           >
@@ -1129,8 +1071,8 @@ const GoalsPage = () => {
                           </Button>
                         )}
                         {selectedGoal.status === 'on_hold' && (
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => handleResumeGoal(selectedGoal.goal_id)}
                           >
@@ -1140,9 +1082,9 @@ const GoalsPage = () => {
                         <Button size="sm" variant="outline" onClick={() => setIsEditMode(true)}>
                           <Edit className="w-4 h-4 mr-2" /> Edit
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
+                        <Button
+                          size="sm"
+                          variant="destructive"
                           onClick={() => handleDeleteGoal(selectedGoal.goal_id)}
                         >
                           <Trash2 className="w-4 h-4 mr-2" /> Delete
@@ -1203,7 +1145,7 @@ const GoalsPage = () => {
                 {/* SMART Framework */}
                 <div className="border rounded-lg p-4 space-y-3">
                   <h3 className="font-semibold text-lg">SMART Framework</h3>
-                  
+
                   <div>
                     <Label>Specific</Label>
                     {isEditMode ? (
@@ -1278,8 +1220,8 @@ const GoalsPage = () => {
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-lg">Milestones</h3>
                     {!addingMilestone && !isEditMode && (
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline"
                         onClick={() => setAddingMilestone(true)}
                       >
@@ -1310,15 +1252,15 @@ const GoalsPage = () => {
                         />
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={handleAddMilestoneToExistingGoal}
                           className="flex-1"
                         >
                           Add Milestone
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => {
                             setAddingMilestone(false);
@@ -1336,7 +1278,7 @@ const GoalsPage = () => {
                   {selectedGoal.milestones && selectedGoal.milestones.length > 0 ? (
                     <div className="space-y-2">
                       {selectedGoal.milestones.map(milestone => (
-                        <div 
+                        <div
                           key={milestone.milestone_id}
                           className="flex items-start gap-3 p-3 bg-secondary rounded"
                         >
@@ -1358,8 +1300,8 @@ const GoalsPage = () => {
                               </p>
                             )}
                           </div>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteMilestone(milestone.milestone_id)}
                           >

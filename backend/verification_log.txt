@@ -1,0 +1,6 @@
+🔍 Starting verification...
+Connected to PostgreSQL
+👤 Testing with User ID: 18adb18d-3b82-4f7d-bbb7-2370ea0b3c9d
+📊 Found 1 conversation items.
+   1. Arjun | Msg: NO | Interaction: Sun Feb 01 2026 23:39:12 GMT+0530 (India Standard Time) | Sort: Sun Feb 01 2026 23:39:12 GMT+0530 (India Standard Time)
+✅ Results are correctly sorted by latest interaction!

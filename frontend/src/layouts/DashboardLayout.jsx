@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useMockData } from '../hooks/useMockData';
+import api from '../lib/api';
 import { USER_ROLES } from '../types';
 import {
   LayoutDashboard,
@@ -33,23 +33,67 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { cn } from '../lib/utils';
+import { format } from 'date-fns';
 
 const DashboardLayout = ({ children }) => {
   const { user, logout } = useAuth();
-  const { notifications } = useMockData(user);
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const unreadNotifications = notifications.filter(n => !n.read);
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get(`/notifications/user/${user.user_id}`);
+      setNotifications(res.data);
+      setUnreadCount(res.data.filter(n => !n.read).length);
+    } catch (err) {
+      console.error("Failed to fetch notifications", err);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      await api.put(`/notifications/${notificationId}/read`);
+      // Update local state
+      setNotifications(prev => prev.map(n =>
+        n.notification_id === notificationId ? { ...n, read: true } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
+
+  const handleNotificationClick = async (notif) => {
+    if (!notif.read) {
+      await markAsRead(notif.notification_id);
+    }
+    setNotificationsOpen(false);
+    // Navigate if link exists (assuming 'related_link' or constructed link)
+    // For now, mapping 'type' to routes or using a 'link' column if it exists
+    // If table has 'link' column:
+    if (notif.link) {
+      navigate(notif.link);
+    } else if (notif.related_id) {
+      // Fallback logic based on type if needed
+    }
+  };
 
   const getNavItems = () => {
     const commonItems = [
       { icon: Calendar, label: 'Sessions', path: '/sessions' },
       { icon: Target, label: 'Goals', path: '/goals' },
       { icon: RefreshCw, label: 'Skill Exchange', path: '/skill-exchange' },
-      { icon: MessageSquare, label: 'Messages', path: '/messages', badge: 1 },
+      { icon: MessageSquare, label: 'Messages', path: '/messages', badge: 0 }, // TODO: Fetch unread messages count
       { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
       { icon: Lightbulb, label: 'Recommendations', path: '/recommendations' },
     ];
@@ -67,11 +111,12 @@ const DashboardLayout = ({ children }) => {
           ...commonItems,
         ];
       case USER_ROLES.ADMIN:
-        return [
-          { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard/admin' },
-          { icon: Shield, label: 'Admin Panel', path: '/admin' },
-          ...commonItems,
-        ];
+        const getAdminNavItems = (currentPath) => [
+          { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard/admin', active: currentPath === '/dashboard/admin' },
+          { icon: Shield, label: 'Admin Panel', path: '/admin', active: currentPath === '/admin' },
+          { icon: Users, label: 'Monitor Sessions', path: '/sessions', active: currentPath === '/sessions' },
+          { icon: BarChart3, label: 'Reports', path: '/reports', active: currentPath === '/reports' }
+        ]; return getAdminNavItems(location.pathname); // Corrected to return admin items
       default:
         return commonItems;
     }
@@ -104,7 +149,7 @@ const DashboardLayout = ({ children }) => {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
-              
+
               return (
                 <Link
                   key={item.path}
@@ -118,7 +163,7 @@ const DashboardLayout = ({ children }) => {
                 >
                   <Icon className="w-5 h-5" />
                   <span className="flex-1">{item.label}</span>
-                  {item.badge && (
+                  {item.badge > 0 && (
                     <Badge className="bg-accent text-accent-foreground">
                       {item.badge}
                     </Badge>
@@ -189,7 +234,7 @@ const DashboardLayout = ({ children }) => {
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path;
-                  
+
                   return (
                     <Link
                       key={item.path}
@@ -204,7 +249,7 @@ const DashboardLayout = ({ children }) => {
                     >
                       <Icon className="w-5 h-5" />
                       <span className="flex-1">{item.label}</span>
-                      {item.badge && (
+                      {item.badge > 0 && (
                         <Badge className="bg-accent text-accent-foreground">
                           {item.badge}
                         </Badge>
@@ -242,7 +287,7 @@ const DashboardLayout = ({ children }) => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                   <Bell className="w-5 h-5" />
-                  {unreadNotifications.length > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full" />
                   )}
                 </Button>
@@ -258,22 +303,19 @@ const DashboardLayout = ({ children }) => {
                   ) : (
                     notifications.map((notif) => (
                       <DropdownMenuItem
-                        key={notif.id}
+                        key={notif.notification_id}
                         className="flex-col items-start p-3 cursor-pointer"
-                        onClick={() => {
-                          navigate(notif.link);
-                          setNotificationsOpen(false);
-                        }}
+                        onClick={() => handleNotificationClick(notif)}
                       >
                         <div className="flex items-start justify-between w-full">
-                          <p className="font-medium text-sm">{notif.title}</p>
+                          <p className={`text-sm ${!notif.read ? 'font-bold' : ''}`}>{notif.title || 'Notification'}</p>
                           {!notif.read && (
                             <div className="w-2 h-2 bg-accent rounded-full mt-1" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">{notif.message}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(notif.createdAt).toLocaleTimeString()}
+                          {notif.created_at ? format(new Date(notif.created_at), 'h:mm a') : ''}
                         </p>
                       </DropdownMenuItem>
                     ))

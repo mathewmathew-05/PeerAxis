@@ -20,8 +20,8 @@ router.post("/", async (req, res) => {
     );
 
     if (existingRequest.rows.length > 0) {
-      return res.status(400).json({ 
-        error: "You already have a pending request with this mentor" 
+      return res.status(400).json({
+        error: "You already have a pending request with this mentor"
       });
     }
 
@@ -41,8 +41,8 @@ router.post("/", async (req, res) => {
     );
 
     if (acceptedRequest.rows.length > 0) {
-      return res.status(400).json({ 
-        error: "You already have an active session scheduled with this mentor" 
+      return res.status(400).json({
+        error: "You already have an active session scheduled with this mentor"
       });
     }
 
@@ -63,7 +63,7 @@ router.post("/", async (req, res) => {
         'request_received',
         'New Mentoring Request',
         `You have a new mentoring request`,
-        `/requests/${result.rows[0].request_id}`
+        '/requests'
       ]
     );
 
@@ -73,14 +73,14 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating request:", err);
-    
+
     // Handle unique constraint violation (error code 23505)
     if (err.code === '23505') {
-      return res.status(400).json({ 
-        error: "You already have a pending request with this mentor" 
+      return res.status(400).json({
+        error: "You already have a pending request with this mentor"
       });
     }
-    
+
     res.status(500).json({ error: err.message });
   }
 });
@@ -155,7 +155,7 @@ router.put("/:requestId", async (req, res) => {
     const request = result.rows[0];
 
     // Create notification for mentee
-    const notificationMessage = status === 'accepted' 
+    const notificationMessage = status === 'accepted'
       ? 'Your mentoring request has been accepted!'
       : 'Your mentoring request was declined';
 
@@ -167,7 +167,7 @@ router.put("/:requestId", async (req, res) => {
         `request_${status}`,
         status === 'accepted' ? 'Request Accepted' : 'Request Declined',
         notificationMessage,
-        status === 'accepted' ? `/sessions/new?mentor=${request.mentor_id}` : null
+        status === 'accepted' ? `/sessions` : `/find-mentor`
       ]
     );
 
@@ -195,7 +195,7 @@ router.delete("/:requestId", async (req, res) => {
       return res.status(404).json({ error: "Request not found" });
     }
 
-    res.json({ 
+    res.json({
       message: "Request cancelled successfully",
       request: result.rows[0]
     });
@@ -254,11 +254,11 @@ router.get("/debug/:menteeId/:mentorId", async (req, res) => {
       pendingRequests: pendingRequests.rows,
       acceptedRequests: acceptedRequests.rows,
       sessions: sessions.rows,
-      recommendation: pendingRequests.rows.length > 0 
+      recommendation: pendingRequests.rows.length > 0
         ? "Cannot send request - pending request exists"
         : acceptedRequests.rows.length > 0 && sessions.rows.some(s => s.status === 'scheduled')
-        ? "Cannot send request - active session exists"
-        : "Can send request"
+          ? "Cannot send request - active session exists"
+          : "Can send request"
     });
   } catch (err) {
     console.error("Debug endpoint error:", err);

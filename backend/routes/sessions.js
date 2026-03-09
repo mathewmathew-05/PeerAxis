@@ -42,14 +42,15 @@ router.post("/", async (req, res) => {
 
     // Create notifications for both users
     await pool.query(
-      `INSERT INTO notifications (user_id, type, title, message)
+      `INSERT INTO notifications (user_id, type, title, message, link)
        VALUES 
-       ($1, 'session_scheduled', 'New Session Scheduled', $3),
-       ($2, 'session_scheduled', 'New Session Scheduled', $3)`,
+       ($1, 'session_scheduled', 'New Session Scheduled', $3, $4),
+       ($2, 'session_scheduled', 'New Session Scheduled', $3, $4)`,
       [
         mentor_id,
         mentee_id,
-        `A session "${topic}" has been scheduled for ${new Date(scheduled_date).toLocaleDateString()}`
+        `A session "${topic}" has been scheduled for ${new Date(scheduled_date).toLocaleDateString()}`,
+        `/sessions/${session.session_id}`
       ]
     );
 
@@ -59,6 +60,79 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating session:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN: GET all sessions (Moved to top to prevent route conflicts)
+router.get("/admin/all", async (req, res) => {
+  console.log("⚡ ADMIN: Fetching all sessions route hit");
+  try {
+    const result = await pool.query(
+      `SELECT 
+        s.*,
+        mentor.name as mentor_name,
+        mentor.avatar as mentor_avatar,
+        mentor.department as mentor_department,
+        mentee.name as mentee_name,
+        mentee.avatar as mentee_avatar,
+        mentee.department as mentee_department
+      FROM sessions s
+      JOIN users mentor ON s.mentor_id = mentor.user_id
+      JOIN users mentee ON s.mentee_id = mentee.user_id
+      ORDER BY s.scheduled_date DESC`
+    );
+    console.log(`✅ Admin fetched ${result.rows.length} sessions`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("❌ Error fetching all sessions:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN: Get negative feedback (ratings <= 2)
+router.get("/admin/negative-feedback", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        s.*,
+        mentor.name as mentor_name,
+        mentee.name as mentee_name
+       FROM sessions s
+       JOIN users mentor ON s.mentor_id = mentor.user_id
+       JOIN users mentee ON s.mentee_id = mentee.user_id
+       WHERE s.rating <= 2
+       ORDER BY s.scheduled_date DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching negative feedback:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN: Get mentor stats
+router.get("/admin/mentor-status", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.user_id,
+        u.name,
+        u.email,
+        u.department,
+        u.rating,
+        COUNT(s.session_id) as total_sessions,
+        COUNT(s.session_id) FILTER (WHERE s.status = 'completed') as completed_sessions,
+        COUNT(s.session_id) FILTER (WHERE s.status = 'cancelled') as cancelled_sessions
+       FROM users u
+       LEFT JOIN sessions s ON u.user_id = s.mentor_id
+       WHERE u.role = 'mentor'
+       GROUP BY u.user_id
+       ORDER BY u.rating DESC NULLS LAST`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching mentor status:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -144,7 +218,7 @@ router.put("/:sessionId", async (req, res) => {
     'status', 'mentor_notes', 'mentee_notes', 'description'
   ];
 
-  const fieldsToUpdate = Object.keys(updates).filter(key => 
+  const fieldsToUpdate = Object.keys(updates).filter(key =>
     allowedFields.includes(key)
   );
 
@@ -153,7 +227,7 @@ router.put("/:sessionId", async (req, res) => {
   }
 
   try {
-    const setClause = fieldsToUpdate.map((field, index) => 
+    const setClause = fieldsToUpdate.map((field, index) =>
       `${field} = $${index + 1}`
     ).join(', ');
 
@@ -322,6 +396,53 @@ router.get("/user/:userId/stats", async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Error fetching session stats:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN: Get negative feedback (ratings <= 2)
+router.get("/admin/negative-feedback", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        s.*,
+        mentor.name as mentor_name,
+        mentee.name as mentee_name
+       FROM sessions s
+       JOIN users mentor ON s.mentor_id = mentor.user_id
+       JOIN users mentee ON s.mentee_id = mentee.user_id
+       WHERE s.rating <= 2
+       ORDER BY s.scheduled_date DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching negative feedback:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN: Get mentor stats
+router.get("/admin/mentor-status", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        u.user_id,
+        u.name,
+        u.email,
+        u.department,
+        u.rating,
+        COUNT(s.session_id) as total_sessions,
+        COUNT(s.session_id) FILTER (WHERE s.status = 'completed') as completed_sessions,
+        COUNT(s.session_id) FILTER (WHERE s.status = 'cancelled') as cancelled_sessions
+       FROM users u
+       LEFT JOIN sessions s ON u.user_id = s.mentor_id
+       WHERE u.role = 'mentor'
+       GROUP BY u.user_id
+       ORDER BY u.rating DESC NULLS LAST`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching mentor status:", err);
     res.status(500).json({ error: err.message });
   }
 });
