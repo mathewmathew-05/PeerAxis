@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import api from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, Clock, Inbox, Send, AlertCircle } from "lucide-react";
@@ -48,10 +49,8 @@ const RequestsPage = () => {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/requests/user/${user.user_id}`
-      );
-      const data = await res.json();
+      const res = await api.get(`/requests/user/${user.user_id}`);
+      const data = res.data;
 
       console.log("📥 Fetched requests:", data);
 
@@ -72,14 +71,7 @@ const RequestsPage = () => {
 
   const handleDeclineRequest = async (requestId) => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/requests/${requestId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "declined" }),
-        }
-      );
+      await api.put(`/requests/${requestId}`, { status: "declined" });
 
       if (!res.ok) throw new Error("Failed to decline request");
 
@@ -92,12 +84,7 @@ const RequestsPage = () => {
 
   const handleCancelRequest = async (requestId) => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/requests/${requestId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      await api.delete(`/requests/${requestId}`);
 
       if (!res.ok) throw new Error("Failed to cancel request");
 
@@ -124,44 +111,21 @@ const RequestsPage = () => {
       });
 
       // Step 1: Create the session
-      const sessionRes = await fetch("http://localhost:5000/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mentor_id: user.user_id,
-          mentee_id: selectedRequest.mentee_id,
-          topic: sessionData.topic,
-          scheduled_date: sessionData.scheduled_date,
-          duration: sessionData.duration,
-          mode: sessionData.mode,
-          location: sessionData.location,
-        }),
+      const sessionRes = await api.post("/sessions", {
+        mentor_id: user.user_id,
+        mentee_id: selectedRequest.mentee_id,
+        topic: sessionData.topic,
+        scheduled_date: sessionData.scheduled_date,
+        duration: sessionData.duration,
+        mode: sessionData.mode,
+        location: sessionData.location,
       });
 
-      if (!sessionRes.ok) {
-        const errorData = await sessionRes.json();
-        console.error("❌ Session creation failed:", errorData);
-        throw new Error(errorData.error || "Failed to create session");
-      }
-
-      const sessionResult = await sessionRes.json();
+      const sessionResult = sessionRes.data;
       console.log("✅ Session created:", sessionResult);
 
       // Step 2: Accept the request
-      const requestRes = await fetch(
-        `http://localhost:5000/api/requests/${selectedRequest.request_id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "accepted" }),
-        }
-      );
-
-      if (!requestRes.ok) {
-        const errorData = await requestRes.json();
-        console.error("❌ Request acceptance failed:", errorData);
-        throw new Error(errorData.error || "Failed to accept request");
-      }
+      await api.put(`/requests/${selectedRequest.request_id}`, { status: "accepted" });
 
       console.log("✅ Request accepted");
 
@@ -210,8 +174,8 @@ const RequestsPage = () => {
               request.status === "pending"
                 ? "default"
                 : request.status === "accepted"
-                ? "secondary"
-                : "destructive"
+                  ? "secondary"
+                  : "destructive"
             }
           >
             {request.status}
@@ -281,8 +245,8 @@ const RequestsPage = () => {
               request.status === "pending"
                 ? "default"
                 : request.status === "accepted"
-                ? "secondary"
-                : "destructive"
+                  ? "secondary"
+                  : "destructive"
             }
           >
             {request.status}
@@ -503,7 +467,7 @@ const RequestsPage = () => {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleScheduleSession}
               disabled={isScheduling}
             >

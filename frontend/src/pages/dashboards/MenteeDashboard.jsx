@@ -1,4 +1,5 @@
 import React from 'react';
+import api from '../../lib/api';
 import { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,31 +30,16 @@ const MenteeDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       // Fetch real sessions
-      const sessionsRes = await fetch(
-        `http://localhost:5000/api/sessions/user/${user.user_id}`
-      );
-      if (sessionsRes.ok) {
-        const sessionsData = await sessionsRes.json();
-        setSessions(sessionsData);
-      }
+      const sessionsRes = await api.get(`/sessions/user/${user.user_id}`);
+      setSessions(sessionsRes.data);
 
       // Fetch real goals
-      const goalsRes = await fetch(
-        `http://localhost:5000/api/goals/user/${user.user_id}`
-      );
-      if (goalsRes.ok) {
-        const goalsData = await goalsRes.json();
-        setGoals(goalsData);
-      }
+      const goalsRes = await api.get(`/goals/user/${user.user_id}`);
+      setGoals(goalsRes.data);
 
       // Fetch recommended mentors
-      const mentorsRes = await fetch(
-        `http://localhost:5000/api/matching/mentors/${user.user_id}`
-      );
-      if (mentorsRes.ok) {
-        const mentorsData = await mentorsRes.json();
-        setRecommendedMentors(mentorsData.slice(0, 3));
-      }
+      const mentorsRes = await api.get(`/matching/mentors/${user.user_id}`);
+      setRecommendedMentors(mentorsRes.data.slice(0, 3));
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
     } finally {

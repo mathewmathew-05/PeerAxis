@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import api from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, Video, Plus, User } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -13,26 +14,23 @@ import { toast } from 'sonner';
 const SessionsPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
-    
     fetchSessions();
   }, [user]);
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/sessions/user/${user.user_id}`
-      );
-      
-      if (!res.ok) throw new Error('Failed to fetch sessions');
-      
-      const data = await res.json();
-      setSessions(data);
+      const endpoint = user.role === 'admin'
+        ? '/sessions/admin/all'
+        : `/sessions/user/${user.user_id}`;
+
+      const res = await api.get(endpoint);
+      setSessions(res.data);
     } catch (err) {
       console.error('Error fetching sessions:', err);
       toast.error('Failed to load sessions');
@@ -44,17 +42,23 @@ const SessionsPage = () => {
   const upcomingSessions = sessions.filter(s => {
     return s.status === 'scheduled' && new Date(s.scheduled_date) > new Date();
   });
-  
+
   const completedSessions = sessions.filter(s => s.status === 'completed');
   const cancelledSessions = sessions.filter(s => s.status === 'cancelled');
 
   const SessionCard = ({ session }) => {
-    const otherUserName = user.role === 'mentor' 
-      ? session.mentee_name 
-      : session.mentor_name;
-    const otherUserAvatar = user.role === 'mentor' 
-      ? session.mentee_avatar 
-      : session.mentor_avatar;
+    // For admins, show both names. For users, show "the other person".
+    const isAdmin = user.role === 'admin';
+
+    let displayName, displayAvatar, displayRole;
+
+    if (isAdmin) {
+      displayName = `${session.mentor_name} (Mentor) & ${session.mentee_name} (Mentee)`;
+      displayAvatar = session.mentor_avatar; // Default to mentor's avatar for icon
+    } else {
+      displayName = user.role === 'mentor' ? session.mentee_name : session.mentor_name;
+      displayAvatar = user.role === 'mentor' ? session.mentee_avatar : session.mentor_avatar;
+    }
 
     return (
       <Card
@@ -65,23 +69,30 @@ const SessionsPage = () => {
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-4">
               <Avatar className="w-12 h-12">
-                <AvatarImage src={otherUserAvatar} />
-                <AvatarFallback>{otherUserName.charAt(0)}</AvatarFallback>
+                <AvatarImage src={displayAvatar} />
+                <AvatarFallback>{isAdmin ? 'S' : displayName.charAt(0)}</AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-semibold">{otherUserName}</h3>
+                <h3 className="font-semibold">{displayName}</h3>
                 <p className="text-sm text-muted-foreground">{session.topic}</p>
+                {isAdmin && (
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {session.mentor_name}</span>
+                    <span>•</span>
+                    <span className="flex items-center"><User className="w-3 h-3 mr-1" /> {session.mentee_name}</span>
+                  </div>
+                )}
               </div>
             </div>
             <Badge variant={
-              session.status === 'scheduled' ? 'default' : 
-              session.status === 'completed' ? 'secondary' : 
-              'destructive'
+              session.status === 'scheduled' ? 'default' :
+                session.status === 'completed' ? 'secondary' :
+                  'destructive'
             }>
               {session.status}
             </Badge>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex items-center space-x-2 text-muted-foreground">
               <CalendarIcon className="w-4 h-4" />
@@ -118,12 +129,16 @@ const SessionsPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-display font-bold mb-2">Sessions</h2>
-          <p className="text-muted-foreground">Manage your mentoring sessions</p>
+          <p className="text-muted-foreground">
+            {user.role === 'admin' ? 'Monitor all platform sessions' : 'Manage your mentoring sessions'}
+          </p>
         </div>
-        <Button onClick={() => navigate(user.role === 'mentee' ? '/find-mentor' : '/requests')}>
-          <Plus className="mr-2 w-4 h-4" />
-          {user.role === 'mentee' ? 'Find Mentor' : 'View Requests'}
-        </Button>
+        {user.role !== 'admin' && (
+          <Button onClick={() => navigate(user.role === 'mentee' ? '/find-mentor' : '/requests')}>
+            <Plus className="mr-2 w-4 h-4" />
+            {user.role === 'mentee' ? 'Find Mentor' : 'View Requests'}
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="upcoming" className="space-y-6">
@@ -139,12 +154,14 @@ const SessionsPage = () => {
               <CardContent className="py-16 text-center">
                 <CalendarIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No upcoming sessions</p>
-                <Button 
-                  className="mt-4" 
-                  onClick={() => navigate(user.role === 'mentee' ? '/find-mentor' : '/requests')}
-                >
-                  {user.role === 'mentee' ? 'Find a Mentor' : 'View Requests'}
-                </Button>
+                {user.role !== 'admin' && (
+                  <Button
+                    className="mt-4"
+                    onClick={() => navigate(user.role === 'mentee' ? '/find-mentor' : '/requests')}
+                  >
+                    {user.role === 'mentee' ? 'Find a Mentor' : 'View Requests'}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (

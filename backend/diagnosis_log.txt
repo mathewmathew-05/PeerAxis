@@ -1,0 +1,43 @@
+🔍 Starting diagnosis...
+Connected to PostgreSQL
+📊 Found 4 recent sessions.
+
+--------------------------------------------------
+🧩 Session ID: 9400691f-61f7-42c8-9380-be7040e18327
+   Mentor: d3df3033-8bf7-4a73-85bd-657bc1618178
+   Mentee: d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22
+   Status: scheduled
+   👀 Checking if Mentee (d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22) can see d3df3033-8bf7-4a73-85bd-657bc1618178...
+      ✅ YES! Found in connections list.
+   👀 Checking if Mentor (d3df3033-8bf7-4a73-85bd-657bc1618178) can see d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22...
+      ✅ YES! Found in connections list.
+
+--------------------------------------------------
+🧩 Session ID: 18100a39-999e-4714-bd2c-6a269d5f7097
+   Mentor: d3df3033-8bf7-4a73-85bd-657bc1618178
+   Mentee: d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22
+   Status: completed
+   👀 Checking if Mentee (d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22) can see d3df3033-8bf7-4a73-85bd-657bc1618178...
+      ✅ YES! Found in connections list.
+   👀 Checking if Mentor (d3df3033-8bf7-4a73-85bd-657bc1618178) can see d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22...
+      ✅ YES! Found in connections list.
+
+--------------------------------------------------
+🧩 Session ID: 87a9eaac-f5ff-4ac9-b565-66275d125dcd
+   Mentor: 18adb18d-3b82-4f7d-bbb7-2370ea0b3c9d
+   Mentee: d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22
+   Status: completed
+   👀 Checking if Mentee (d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22) can see 18adb18d-3b82-4f7d-bbb7-2370ea0b3c9d...
+      ✅ YES! Found in connections list.
+   👀 Checking if Mentor (18adb18d-3b82-4f7d-bbb7-2370ea0b3c9d) can see d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22...
+      ✅ YES! Found in connections list.
+
+--------------------------------------------------
+🧩 Session ID: ef3e4d42-760c-4ffa-9eca-ec45145b8bc3
+   Mentor: d3df3033-8bf7-4a73-85bd-657bc1618178
+   Mentee: d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22
+   Status: cancelled
+   👀 Checking if Mentee (d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22) can see d3df3033-8bf7-4a73-85bd-657bc1618178...
+      ✅ YES! Found in connections list.
+   👀 Checking if Mentor (d3df3033-8bf7-4a73-85bd-657bc1618178) can see d7a13aa5-3bc2-4aa1-b33c-20c7b9ac2b22...
+      ✅ YES! Found in connections list.
