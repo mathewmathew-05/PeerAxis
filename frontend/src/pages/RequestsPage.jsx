@@ -72,26 +72,20 @@ const RequestsPage = () => {
   const handleDeclineRequest = async (requestId) => {
     try {
       await api.put(`/requests/${requestId}`, { status: "declined" });
-
-      if (!res.ok) throw new Error("Failed to decline request");
-
       toast.success("Request declined");
       fetchRequests();
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || "Failed to decline request");
     }
   };
 
   const handleCancelRequest = async (requestId) => {
     try {
       await api.delete(`/requests/${requestId}`);
-
-      if (!res.ok) throw new Error("Failed to cancel request");
-
       toast.success("Request cancelled");
       fetchRequests();
     } catch (err) {
-      toast.error(err.message);
+      toast.error(err.response?.data?.error || "Failed to cancel request");
     }
   };
 
@@ -184,7 +178,7 @@ const RequestsPage = () => {
 
         {request.message && (
           <p className="text-sm text-muted-foreground mb-4 p-3 bg-muted rounded-lg">
-            "{request.message}"
+            &quot;{request.message}&quot;
           </p>
         )}
 

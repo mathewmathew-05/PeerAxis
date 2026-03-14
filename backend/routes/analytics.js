@@ -80,4 +80,69 @@ router.get("/leaderboard", async (req, res) => {
     }
 });
 
+// GET Personalised Recommendations for a user
+router.get("/recommendations/:userId", async (req, res) => {
+    const { userId } = req.params;
+    try {
+        // 1. Get user's active goal categories & tags
+        const goalsResult = await pool.query(
+            `SELECT category, tags FROM goals WHERE user_id = $1 AND status IN ('on_track', 'at_risk')`,
+            [userId]
+        );
+
+        // 2. Get user's mentee learning skills (for mentees)
+        const learningResult = await pool.query(
+            `SELECT skill_name FROM mentee_learning_skills WHERE mentee_id = $1`,
+            [userId]
+        );
+
+        // Collect all relevant keywords
+        const categories = goalsResult.rows.map(g => g.category);
+        const goalTags = goalsResult.rows.flatMap(g => g.tags || []);
+        const learningSkills = learningResult.rows.map(r => r.skill_name);
+        const allKeywords = [...new Set([...categories, ...goalTags, ...learningSkills])];
+
+        // 3. Find mentors whose skills overlap with the keywords
+        let mentors = [];
+        if (allKeywords.length > 0) {
+            const mentorResult = await pool.query(
+                `SELECT user_id, name, department, skills, avatar, rating
+                 FROM users
+                 WHERE role = 'mentor'
+                 AND skills && $1::text[]
+                 ORDER BY rating DESC NULLS LAST
+                 LIMIT 6`,
+                [allKeywords]
+            );
+            mentors = mentorResult.rows;
+        }
+
+        // If no keyword-based matches, fall back to top-rated mentors
+        if (mentors.length === 0) {
+            const fallback = await pool.query(
+                `SELECT user_id, name, department, skills, avatar, rating
+                 FROM users
+                 WHERE role = 'mentor'
+                 ORDER BY rating DESC NULLS LAST
+                 LIMIT 6`
+            );
+            mentors = fallback.rows;
+        }
+
+        res.json({
+            keywords: allKeywords,
+            mentors: mentors.map(m => ({
+                ...m,
+                matchedSkills: (m.skills || []).filter(s =>
+                    allKeywords.some(k => s.toLowerCase().includes(k.toLowerCase()))
+                )
+            }))
+        });
+    } catch (err) {
+        console.error("Error fetching recommendations:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
+

@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Shield, Users, Activity, Flag, Trophy, Award, Search, Trash2 } from 'lucide-react';
+import { Shield, Users, Activity, Flag, Trophy, Trash2, Ban, UserCheck } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
 
 const AdminPanelPage = () => {
@@ -38,6 +39,44 @@ const AdminPanelPage = () => {
       toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId, newRole) => {
+    try {
+      await api.put(`/users/${userId}/role`, { role: newRole });
+      setUsers(prev => prev.map(u =>
+        u.user_id === userId ? { ...u, role: newRole } : u
+      ));
+      toast.success(`Role updated to ${newRole}`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update role');
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you sure you want to delete ${userName}? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/users/${userId}`);
+      setUsers(prev => prev.filter(u => u.user_id !== userId));
+      toast.success(`${userName} deleted`);
+    } catch (err) {
+      toast.error('Failed to delete user');
+    }
+  };
+
+  const handleToggleStatus = async (userId, currentStatus) => {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'activate' : 'ban';
+    if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
+    try {
+      await api.put(`/users/${userId}/status`, { is_active: newStatus });
+      setUsers(prev => prev.map(u =>
+        u.user_id === userId ? { ...u, is_active: newStatus } : u
+      ));
+      toast.success(`User ${newStatus ? 'activated' : 'banned'} successfully`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update user status');
     }
   };
 
@@ -91,16 +130,54 @@ const AdminPanelPage = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'mentor' ? 'default' : 'secondary'}>
-                          {user.role}
-                        </Badge>
+                        {user.role === 'admin' ? (
+                          <Badge variant="destructive">admin</Badge>
+                        ) : (
+                          <Select
+                            value={user.role}
+                            onValueChange={(val) => handleRoleChange(user.user_id, val)}
+                          >
+                            <SelectTrigger className="w-28 h-7 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="mentee">mentee</SelectItem>
+                              <SelectItem value="mentor">mentor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </TableCell>
                       <TableCell>{user.department || '-'}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-green-600">Active</Badge></TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {user.is_active === false
+                          ? <Badge variant="destructive">Banned</Badge>
+                          : <Badge variant="outline" className="text-green-600">Active</Badge>
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {user.role !== 'admin' && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={user.is_active === false ? 'text-green-600 hover:bg-green-50' : 'text-amber-600 hover:bg-amber-50'}
+                              onClick={() => handleToggleStatus(user.user_id, user.is_active !== false)}
+                              title={user.is_active === false ? 'Activate User' : 'Ban User'}
+                            >
+                              {user.is_active === false
+                                ? <UserCheck className="w-4 h-4" />
+                                : <Ban className="w-4 h-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10"
+                              onClick={() => handleDeleteUser(user.user_id, user.name)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -203,8 +280,8 @@ const AdminPanelPage = () => {
                       <TableCell className="font-bold">
                         {idx < 3 ? (
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center ${idx === 0 ? 'bg-yellow-100 text-yellow-600' :
-                              idx === 1 ? 'bg-gray-100 text-gray-600' :
-                                'bg-orange-100 text-orange-600'
+                            idx === 1 ? 'bg-gray-100 text-gray-600' :
+                              'bg-orange-100 text-orange-600'
                             }`}>
                             {idx + 1}
                           </div>

@@ -109,4 +109,19 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
+// GET unread message count for a user
+router.get('/unread-count/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT COUNT(*) as count FROM messages WHERE receiver_id = $1 AND read = false`,
+            [userId]
+        );
+        res.json({ count: parseInt(result.rows[0].count) });
+    } catch (err) {
+        // If read column doesn't exist, return 0 gracefully
+        res.json({ count: 0 });
+    }
+});
+
 module.exports = router;

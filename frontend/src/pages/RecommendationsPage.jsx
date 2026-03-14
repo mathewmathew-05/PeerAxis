@@ -1,42 +1,33 @@
-import React from 'react';
-import { Lightbulb, BookOpen, Video, FileText, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import api from '../lib/api';
+import { Lightbulb, Star, Users, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { toast } from 'sonner';
 
 const RecommendationsPage = () => {
-  const recommendations = [
-    {
-      id: 1,
-      title: 'Complete Guide to Dynamic Programming',
-      type: 'article',
-      description: 'Master DP concepts from basics to advanced with 50+ solved problems',
-      tags: ['DSA', 'Algorithms'],
-      link: '#'
-    },
-    {
-      id: 2,
-      title: 'React Hooks Tutorial',
-      type: 'video',
-      description: 'Learn useState, useEffect, and custom hooks with practical examples',
-      tags: ['Web Dev', 'React'],
-      link: '#'
-    },
-    {
-      id: 3,
-      title: 'System Design Interview Preparation',
-      type: 'course',
-      description: 'Complete course on designing scalable systems for tech interviews',
-      tags: ['System Design', 'Interviews'],
-      link: '#'
-    },
-  ];
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [data, setData] = useState({ keywords: [], mentors: [] });
+  const [loading, setLoading] = useState(true);
 
-  const getIcon = (type) => {
-    switch (type) {
-      case 'video': return <Video className="w-5 h-5" />;
-      case 'course': return <BookOpen className="w-5 h-5" />;
-      default: return <FileText className="w-5 h-5" />;
+  useEffect(() => {
+    if (user) fetchRecommendations();
+  }, [user]);
+
+  const fetchRecommendations = async () => {
+    try {
+      const res = await api.get(`/analytics/recommendations/${user.user_id}`);
+      setData(res.data);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load recommendations');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -44,40 +35,106 @@ const RecommendationsPage = () => {
     <div className="space-y-6 animate-fadeIn">
       <div>
         <h2 className="text-3xl font-display font-bold mb-2">Personalized Recommendations</h2>
-        <p className="text-muted-foreground">AI-powered learning resources based on your goals</p>
+        <p className="text-muted-foreground">Mentors matched to your goals and learning interests</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {recommendations.map(rec => (
-          <Card key={rec.id} className="hover:border-primary transition-smooth">
-            <CardHeader>
-              <div className="flex items-start justify-between">
+      {/* Keywords / Interest Tags */}
+      {data.keywords.length > 0 && (
+        <Card>
+          <CardContent className="p-4 flex flex-wrap gap-2 items-center">
+            <Lightbulb className="w-4 h-4 text-primary mr-1" />
+            <span className="text-sm text-muted-foreground mr-2">Based on:</span>
+            {data.keywords.map(kw => (
+              <Badge key={kw} variant="secondary" className="capitalize">{kw}</Badge>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <p className="text-muted-foreground animate-pulse">Finding your best matches...</p>
+      ) : data.mentors.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground mb-4">No mentor matches found yet.</p>
+            <p className="text-sm text-muted-foreground mb-6">
+              Add goals or learning skills to your profile to get personalized recommendations.
+            </p>
+            <div className="flex justify-center gap-3">
+              <Button variant="outline" onClick={() => navigate('/goals')}>Set Goals</Button>
+              <Button onClick={() => navigate('/find-mentor')}>Browse All Mentors</Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {data.mentors.map(mentor => (
+            <Card key={mentor.user_id} className="hover:border-primary transition-smooth">
+              <CardHeader className="pb-3">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                    {getIcon(rec.type)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">{rec.title}</CardTitle>
-                    <Badge variant="secondary" className="mt-1 capitalize">{rec.type}</Badge>
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={mentor.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mentor.name}`} />
+                    <AvatarFallback>{mentor.name?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base truncate">{mentor.name}</CardTitle>
+                    <p className="text-sm text-muted-foreground">{mentor.department || 'General'}</p>
                   </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">{rec.description}</p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {rec.tags.map(tag => (
-                  <Badge key={tag} variant="outline">{tag}</Badge>
-                ))}
-              </div>
-              <Button className="w-full" variant="outline">
-                View Resource
-                <ExternalLink className="ml-2 w-4 h-4" />
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Rating */}
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-4 h-4 text-orange-500 fill-orange-500" />
+                  <span className="text-sm font-medium">{mentor.rating ? Number(mentor.rating).toFixed(1) : 'New'}</span>
+                </div>
+
+                {/* Matched Skills */}
+                {mentor.matchedSkills?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {mentor.matchedSkills.slice(0, 4).map(skill => (
+                      <Badge key={skill} className="bg-emerald-500/10 text-emerald-600 border-0 text-xs">
+                        ✓ {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {/* All skills */}
+                {mentor.skills?.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {(mentor.skills || [])
+                      .filter(s => !mentor.matchedSkills?.includes(s))
+                      .slice(0, 3)
+                      .map(skill => (
+                        <Badge key={skill} variant="outline" className="text-xs">{skill}</Badge>
+                      ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    className="flex-1"
+                    size="sm"
+                    onClick={() => navigate('/find-mentor')}
+                  >
+                    Request Mentoring
+                    <ArrowRight className="ml-1 w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/messages?userId=${mentor.user_id}`)}
+                  >
+                    Message
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
