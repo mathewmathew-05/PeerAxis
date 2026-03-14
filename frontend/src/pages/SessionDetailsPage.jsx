@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar, Clock, MapPin, Video, Trash2, Star, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, Trash2, Star, CheckCircle, ArrowLeft, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Textarea } from '../components/ui/textarea';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +36,7 @@ const SessionDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
@@ -44,11 +46,19 @@ const SessionDetailsPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [activeGoals, setActiveGoals] = useState([]);
+  const [selectedGoalId, setSelectedGoalId] = useState('');
+
+  // Reschedule state
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [isRescheduling, setIsRescheduling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    
     fetchSession();
+    if (user.role === 'mentee') fetchActiveGoals();
   }, [id]);
 
   const fetchSession = async () => {
@@ -56,20 +66,20 @@ const SessionDetailsPage = () => {
       const res = await fetch(
         `http://localhost:5000/api/sessions/${id}`
       );
-      
+
       if (!res.ok) throw new Error('Session not found');
-      
+
       const data = await res.json();
       console.log('📅 Session loaded:', data);
       setSession(data);
-      
+
       // Set notes based on user role
       if (user.role === 'mentor') {
         setNotes(data.mentor_notes || '');
       } else {
         setNotes(data.mentee_notes || '');
       }
-      
+
       // Set existing rating if available
       if (data.rating) {
         setRating(data.rating);
@@ -80,6 +90,17 @@ const SessionDetailsPage = () => {
       toast.error('Failed to load session details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveGoals = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/goals/user/${user.user_id}`);
+      const data = await res.json();
+      // Fix: real statuses are 'on_track' and 'at_risk', not 'active'
+      setActiveGoals(Array.isArray(data) ? data.filter(g => g.status === 'on_track' || g.status === 'at_risk') : []);
+    } catch (err) {
+      console.error('Error fetching goals:', err);
     }
   };
 
@@ -108,13 +129,8 @@ const SessionDetailsPage = () => {
   };
 
   const handleMarkComplete = () => {
-    // Open dialog for mentees (need rating), or confirm for mentors
-    if (user.role === 'mentee') {
-      setShowCompleteDialog(true);
-    } else {
-      // Mentors can complete directly
-      handleSubmitComplete();
-    }
+    // Both mentee and mentor get a feedback dialog
+    setShowCompleteDialog(true);
   };
 
   const handleSubmitComplete = async () => {
@@ -134,11 +150,7 @@ const SessionDetailsPage = () => {
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              rating,
-              feedback,
-              user_id: user.user_id,
-            }),
+            body: JSON.stringify({ rating, feedback, user_id: user.user_id }),
           }
         );
 
@@ -148,22 +160,42 @@ const SessionDetailsPage = () => {
         }
 
         toast.success('Session completed and rating submitted!');
+
+        if (selectedGoalId) {
+          const linkedGoal = activeGoals.find(g => g.goal_id === selectedGoalId);
+          if (linkedGoal) {
+            const newProgress = Math.min(100, Number(linkedGoal.progress) + 10);
+            await fetch(`http://localhost:5000/api/goals/${selectedGoalId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ progress: newProgress }),
+            });
+            toast.success(`Goal "${linkedGoal.title}" updated to ${newProgress}%!`);
+          }
+        }
+
       } else {
-        // Mentor just marks as complete
-        const res = await fetch(
+        // Mentor: mark complete first, then submit their feedback if provided
+        const completeRes = await fetch(
           `http://localhost:5000/api/sessions/${id}`,
           {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: 'completed',
-            }),
+            body: JSON.stringify({ status: 'completed' }),
           }
         );
-
-        if (!res.ok) {
-          const error = await res.json();
+        if (!completeRes.ok) {
+          const error = await completeRes.json();
           throw new Error(error.error || 'Failed to complete session');
+        }
+
+        // Submit mentor feedback if rating given
+        if (rating > 0) {
+          await fetch(`http://localhost:5000/api/sessions/${id}/mentor-feedback`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mentor_rating: rating, mentor_feedback: feedback }),
+          });
         }
 
         toast.success('Session marked as completed!');
@@ -182,7 +214,7 @@ const SessionDetailsPage = () => {
   const handleCancelSession = async () => {
     try {
       console.log('🗑️ Attempting to cancel session:', id);
-      
+
       const res = await fetch(
         `http://localhost:5000/api/sessions/${id}?reason=${encodeURIComponent(cancelReason || 'Cancelled by user')}`,
         {
@@ -198,7 +230,7 @@ const SessionDetailsPage = () => {
       console.log('✅ Session cancelled successfully');
       toast.success('Session cancelled successfully');
       setShowCancelDialog(false);
-      
+
       // Navigate back to sessions list
       setTimeout(() => {
         navigate('/sessions');
@@ -232,7 +264,7 @@ const SessionDetailsPage = () => {
 
   // Determine if user is mentor or mentee
   const isMentor = user.user_id === session.mentor_id;
-  const partner = isMentor 
+  const partner = isMentor
     ? { name: session.mentee_name, avatar: session.mentee_avatar }
     : { name: session.mentor_name, avatar: session.mentor_avatar };
 
@@ -241,10 +273,47 @@ const SessionDetailsPage = () => {
   const isPast = sessionDate < new Date();
   const canComplete = session.status === 'scheduled' && isPast;
   const canCancel = session.status === 'scheduled' && !isPast;
+  const canReschedule = session.status === 'scheduled' && !isPast;
+
+  const openRescheduleDialog = () => {
+    // Pre-fill with current scheduled date/time
+    const d = new Date(session.scheduled_date);
+    setRescheduleDate(d.toISOString().split('T')[0]);
+    setRescheduleTime(d.toTimeString().slice(0, 5));
+    setShowRescheduleDialog(true);
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleDate || !rescheduleTime) {
+      toast.error('Please select a date and time');
+      return;
+    }
+    setIsRescheduling(true);
+    try {
+      const newDate = `${rescheduleDate}T${rescheduleTime}:00`;
+      const res = await fetch(`http://localhost:5000/api/sessions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduled_date: newDate }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to reschedule');
+      }
+      toast.success('Session rescheduled successfully!');
+      setShowRescheduleDialog(false);
+      // Re-fetch from DB so date/time display is fresh for both users
+      fetchSession();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
 
   const ratingLabels = {
     1: "Poor",
-    2: "Fair", 
+    2: "Fair",
     3: "Good",
     4: "Very Good",
     5: "Excellent"
@@ -274,9 +343,9 @@ const SessionDetailsPage = () => {
               </div>
             </div>
             <Badge variant={
-              session.status === 'scheduled' ? 'default' : 
-              session.status === 'completed' ? 'secondary' : 
-              'destructive'
+              session.status === 'scheduled' ? 'default' :
+                session.status === 'completed' ? 'secondary' :
+                  'destructive'
             }>
               {session.status}
             </Badge>
@@ -316,10 +385,10 @@ const SessionDetailsPage = () => {
                 <div>
                   <p className="text-muted-foreground">Location</p>
                   {session.mode === 'online' && session.location ? (
-                    <a 
-                      href={session.location} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                    <a
+                      href={session.location}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="font-medium text-primary hover:underline"
                     >
                       Join Meeting
@@ -344,7 +413,7 @@ const SessionDetailsPage = () => {
           {/* Action Buttons */}
           <div className="mt-6 flex gap-3">
             {canComplete && (
-              <Button 
+              <Button
                 onClick={handleMarkComplete}
                 className="bg-green-600 hover:bg-green-700"
               >
@@ -352,9 +421,19 @@ const SessionDetailsPage = () => {
                 Mark as Complete
               </Button>
             )}
-            
+
+            {canReschedule && (
+              <Button
+                variant="outline"
+                onClick={openRescheduleDialog}
+              >
+                <CalendarClock className="mr-2 w-4 h-4" />
+                Reschedule
+              </Button>
+            )}
+
             {canCancel && (
-              <Button 
+              <Button
                 variant="destructive"
                 onClick={() => setShowCancelDialog(true)}
               >
@@ -388,7 +467,7 @@ const SessionDetailsPage = () => {
                 onChange={(e) => setNotes(e.target.value)}
                 disabled={session.status === 'cancelled'}
               />
-              <Button 
+              <Button
                 onClick={handleSaveNotes}
                 disabled={session.status === 'cancelled'}
               >
@@ -415,11 +494,10 @@ const SessionDetailsPage = () => {
                         {[1, 2, 3, 4, 5].map((star) => (
                           <Star
                             key={star}
-                            className={`w-6 h-6 ${
-                              star <= session.rating 
-                                ? 'text-yellow-500 fill-yellow-500' 
-                                : 'text-gray-300'
-                            }`}
+                            className={`w-6 h-6 ${star <= session.rating
+                              ? 'text-yellow-500 fill-yellow-500'
+                              : 'text-gray-300'
+                              }`}
                           />
                         ))}
                       </div>
@@ -447,9 +525,13 @@ const SessionDetailsPage = () => {
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Complete Session & Rate</DialogTitle>
+            <DialogTitle>
+              {isMentor ? 'Complete Session & Add Feedback (Optional)' : 'Complete Session & Rate'}
+            </DialogTitle>
             <DialogDescription>
-              How would you rate this session with {session.mentor_name}?
+              {isMentor
+                ? `Mark this session with ${session.mentee_name} as complete. You may optionally leave a rating.`
+                : `How would you rate this session with ${session.mentor_name}?`}
             </DialogDescription>
           </DialogHeader>
 
@@ -464,11 +546,10 @@ const SessionDetailsPage = () => {
                     className="transition-transform hover:scale-110"
                   >
                     <Star
-                      className={`w-10 h-10 ${
-                        star <= rating 
-                          ? 'text-yellow-500 fill-yellow-500' 
-                          : 'text-gray-300 hover:text-yellow-400'
-                      }`}
+                      className={`w-10 h-10 ${star <= rating
+                        ? 'text-yellow-500 fill-yellow-500'
+                        : 'text-gray-300 hover:text-yellow-400'
+                        }`}
                     />
                   </button>
                 ))}
@@ -489,6 +570,28 @@ const SessionDetailsPage = () => {
                 onChange={(e) => setFeedback(e.target.value)}
               />
             </div>
+
+            {/* Goal-Session Linking */}
+            {activeGoals.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Link to a Goal (Optional)</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Completing this session will add +10% progress to the selected goal.
+                </p>
+                <select
+                  className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedGoalId}
+                  onChange={e => setSelectedGoalId(e.target.value)}
+                >
+                  <option value="">-- No goal (skip) --</option>
+                  {activeGoals.map(g => (
+                    <option key={g.goal_id} value={g.goal_id}>
+                      {g.title} ({g.progress}% done)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -499,7 +602,7 @@ const SessionDetailsPage = () => {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleSubmitComplete}
               disabled={isSubmitting || rating === 0}
             >
@@ -536,12 +639,54 @@ const SessionDetailsPage = () => {
             >
               Keep Session
             </Button>
-            <Button 
+            <Button
               variant="destructive"
               onClick={handleCancelSession}
             >
               <Trash2 className="mr-2 w-4 h-4" />
               Cancel Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Dialog */}
+      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="w-5 h-5 text-primary" />
+              Reschedule Session
+            </DialogTitle>
+            <DialogDescription>
+              Choose a new date and time for this session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>New Date</Label>
+              <Input
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                value={rescheduleDate}
+                onChange={e => setRescheduleDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>New Time</Label>
+              <Input
+                type="time"
+                value={rescheduleTime}
+                onChange={e => setRescheduleTime(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRescheduleDialog(false)} disabled={isRescheduling}>
+              Keep Current Time
+            </Button>
+            <Button onClick={handleReschedule} disabled={isRescheduling}>
+              {isRescheduling ? 'Saving...' : 'Save New Time'}
             </Button>
           </DialogFooter>
         </DialogContent>

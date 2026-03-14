@@ -3,8 +3,34 @@ const pool = require("../db");
 
 const router = express.Router();
 
+// UPDATE user role (Admin only — mentee<->mentor)
+router.put("/:userId/role", async (req, res) => {
+  const { userId } = req.params;
+  const { role } = req.body;
+
+  if (!['mentor', 'mentee'].includes(role)) {
+    return res.status(400).json({ error: "Role must be 'mentor' or 'mentee'" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users SET role = $1 WHERE user_id = $2 AND role != 'admin' RETURNING user_id, name, email, role`,
+      [role, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found or cannot change admin role" });
+    }
+
+    res.json({ message: `Role updated to ${role}`, user: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 //route for the user profile
 router.put("/profile/:userId", async (req, res) => {
+
   const { userId } = req.params;
   const { skills, availability, department, bio, avatar } = req.body;
 
@@ -113,6 +139,31 @@ router.delete("/:userId", async (req, res) => {
   try {
     await pool.query("DELETE FROM users WHERE user_id = $1", [req.params.userId]);
     res.json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// TOGGLE user active/banned status (Admin only)
+router.put("/:userId/status", async (req, res) => {
+  const { userId } = req.params;
+  const { is_active } = req.body;
+
+  if (typeof is_active !== 'boolean') {
+    return res.status(400).json({ error: "is_active must be a boolean" });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users SET is_active = $1 WHERE user_id = $2 AND role != 'admin'
+       RETURNING user_id, name, is_active`,
+      [is_active, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found or cannot deactivate admin" });
+    }
+    const action = is_active ? 'activated' : 'banned';
+    res.json({ message: `User ${action} successfully`, user: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

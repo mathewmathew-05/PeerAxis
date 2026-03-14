@@ -285,10 +285,6 @@ const FindMentorPage = () => {
       const data = res.data;
       console.log('📥 Response:', { status: res.status, data });
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to send request");
-      }
-
       toast.success("Request sent!", {
         description: `Your mentoring request has been sent to ${selectedMentor.name}`,
       });

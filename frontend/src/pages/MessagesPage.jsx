@@ -20,6 +20,7 @@ const MessagesPage = () => {
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [socket, setSocket] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const scrollAreaRef = useRef(null);
   const [searchParams] = useSearchParams();
   const predefinedUserId = searchParams.get('userId');
@@ -155,6 +156,10 @@ const MessagesPage = () => {
     }
   };
 
+  const filteredConversations = conversations.filter(c =>
+    c.other_user_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <div>
@@ -169,17 +174,22 @@ const MessagesPage = () => {
             <div className="p-4 border-b border-border">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search messages..." className="pl-10" />
+                <Input
+                  placeholder="Search messages..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
               </div>
             </div>
             <ScrollArea className="flex-1">
-              {conversations.length === 0 && (
+              {filteredConversations.length === 0 && (
                 <div className="p-4 text-center text-muted-foreground text-sm">
-                  No active conversations.<br />
-                  Connect with a mentor or mentee to start chatting.
+                  {searchQuery ? 'No conversations match your search.' : 'No active conversations.'}<br />
+                  {!searchQuery && 'Connect with a mentor or mentee to start chatting.'}
                 </div>
               )}
-              {conversations.map(conv => (
+              {filteredConversations.map(conv => (
                 <div
                   key={conv.other_user_id}
                   className={`p-4 border-b border-border cursor-pointer hover:bg-muted transition-smooth ${selectedConversation?.other_user_id === conv.other_user_id ? 'bg-muted' : ''

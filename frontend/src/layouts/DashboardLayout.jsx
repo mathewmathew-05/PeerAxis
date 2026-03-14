@@ -18,7 +18,8 @@ import {
   X,
   User,
   Shield,
-  RefreshCw
+  RefreshCw,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -43,12 +44,26 @@ const DashboardLayout = ({ children }) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     if (user) {
       fetchNotifications();
+      fetchUnreadMessages();
+      // Poll unread messages every 30s
+      const interval = setInterval(fetchUnreadMessages, 30000);
+      return () => clearInterval(interval);
     }
   }, [user]);
+
+  const fetchUnreadMessages = async () => {
+    try {
+      const res = await api.get(`/messages/unread-count/${user.user_id}`);
+      setUnreadMessages(res.data.count);
+    } catch (err) {
+      // silently ignore
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -73,6 +88,16 @@ const DashboardLayout = ({ children }) => {
     }
   };
 
+  const markAllAsRead = async () => {
+    try {
+      await api.put(`/notifications/user/${user.user_id}/read-all`);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
+  };
+
   const handleNotificationClick = async (notif) => {
     if (!notif.read) {
       await markAsRead(notif.notification_id);
@@ -93,7 +118,7 @@ const DashboardLayout = ({ children }) => {
       { icon: Calendar, label: 'Sessions', path: '/sessions' },
       { icon: Target, label: 'Goals', path: '/goals' },
       { icon: RefreshCw, label: 'Skill Exchange', path: '/skill-exchange' },
-      { icon: MessageSquare, label: 'Messages', path: '/messages', badge: 0 }, // TODO: Fetch unread messages count
+      { icon: MessageSquare, label: 'Messages', path: '/messages', badge: unreadMessages },
       { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
       { icon: Lightbulb, label: 'Recommendations', path: '/recommendations' },
     ];
@@ -293,7 +318,17 @@ const DashboardLayout = ({ children }) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="font-semibold text-sm">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
                 <DropdownMenuSeparator />
                 <ScrollArea className="h-64">
                   {notifications.length === 0 ? (

@@ -28,6 +28,10 @@ const ReportsPage = () => {
                 const res = await api.get('/sessions/admin/mentor-status');
                 data = res.data;
                 headers = ['Mentor ID', 'Name', 'Rating', 'Total Sessions', 'Completed', 'Cancelled'];
+            } else if (type === 'exchanges') {
+                const res = await api.get('/skills');
+                data = res.data;
+                headers = ['Exchange ID', 'Skill Name', 'Type', 'Description', 'Posted By', 'Status', 'Created At'];
             }
 
             // Convert to CSV
@@ -64,6 +68,17 @@ const ReportsPage = () => {
                             row.total_sessions,
                             row.completed_sessions,
                             row.cancelled_sessions
+                        ].join(',');
+                    }
+                    if (type === 'exchanges') {
+                        return [
+                            row.exchange_id,
+                            `"${row.skill_name}"`,
+                            row.exchange_type,
+                            `"${(row.description || '').replace(/"/g, '""')}"`,
+                            `"${row.user_name || ''}"`,
+                            row.status,
+                            row.created_at
                         ].join(',');
                     }
                     return '';
@@ -141,6 +156,12 @@ const ReportsPage = () => {
                     title="Mentor Performance"
                     description="Analytics on mentor ratings, session completion, and feedback"
                     icon={BarChart}
+                />
+                <ReportCard
+                    type="exchanges"
+                    title="Skill Exchanges"
+                    description="All skill exchange posts — what users are offering and wanting"
+                    icon={Activity}
                 />
             </div>
         </div>

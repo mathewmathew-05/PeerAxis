@@ -176,6 +176,28 @@ router.get("/user/:userId", async (req, res) => {
   }
 });
 
+// GET session statistics for a user  ← must be BEFORE /:sessionId
+router.get("/user/:userId/stats", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT 
+        COUNT(*) FILTER (WHERE status = 'scheduled') as upcoming_count,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
+        AVG(rating) FILTER (WHERE rating IS NOT NULL)::NUMERIC(3,2) as avg_rating,
+        COUNT(*) as total_sessions
+       FROM sessions
+       WHERE mentor_id = $1 OR mentee_id = $1`,
+      [userId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Error fetching session stats:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET session by ID
 router.get("/:sessionId", async (req, res) => {
   const { sessionId } = req.params;
@@ -377,72 +399,33 @@ router.delete("/:sessionId", async (req, res) => {
   }
 });
 
-// GET session statistics for a user
-router.get("/user/:userId/stats", async (req, res) => {
-  const { userId } = req.params;
+// MENTOR FEEDBACK - mentor rates the session from their side
+router.put("/:sessionId/mentor-feedback", async (req, res) => {
+  const { sessionId } = req.params;
+  const { mentor_rating, mentor_feedback } = req.body;
 
-  try {
-    const result = await pool.query(
-      `SELECT 
-        COUNT(*) FILTER (WHERE status = 'scheduled') as upcoming_count,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
-        AVG(rating) FILTER (WHERE rating IS NOT NULL)::NUMERIC(3,2) as avg_rating,
-        COUNT(*) as total_sessions
-       FROM sessions
-       WHERE mentor_id = $1 OR mentee_id = $1`,
-      [userId]
-    );
-
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Error fetching session stats:", err);
-    res.status(500).json({ error: err.message });
+  if (!mentor_rating || mentor_rating < 1 || mentor_rating > 5) {
+    return res.status(400).json({ error: "mentor_rating must be between 1 and 5" });
   }
-});
 
-// ADMIN: Get negative feedback (ratings <= 2)
-router.get("/admin/negative-feedback", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT 
-        s.*,
-        mentor.name as mentor_name,
-        mentee.name as mentee_name
-       FROM sessions s
-       JOIN users mentor ON s.mentor_id = mentor.user_id
-       JOIN users mentee ON s.mentee_id = mentee.user_id
-       WHERE s.rating <= 2
-       ORDER BY s.scheduled_date DESC`
+      `UPDATE sessions
+       SET mentor_rating = $1,
+           mentor_feedback = $2,
+           updated_at = NOW()
+       WHERE session_id = $3 AND status = 'completed'
+       RETURNING *`,
+      [mentor_rating, mentor_feedback || null, sessionId]
     );
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Error fetching negative feedback:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// ADMIN: Get mentor stats
-router.get("/admin/mentor-status", async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT 
-        u.user_id,
-        u.name,
-        u.email,
-        u.department,
-        u.rating,
-        COUNT(s.session_id) as total_sessions,
-        COUNT(s.session_id) FILTER (WHERE s.status = 'completed') as completed_sessions,
-        COUNT(s.session_id) FILTER (WHERE s.status = 'cancelled') as cancelled_sessions
-       FROM users u
-       LEFT JOIN sessions s ON u.user_id = s.mentor_id
-       WHERE u.role = 'mentor'
-       GROUP BY u.user_id
-       ORDER BY u.rating DESC NULLS LAST`
-    );
-    res.json(result.rows);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Session not found or not yet completed" });
+    }
+
+    res.json({ message: "Mentor feedback submitted", session: result.rows[0] });
   } catch (err) {
-    console.error("Error fetching mentor status:", err);
+    console.error("Error saving mentor feedback:", err);
     res.status(500).json({ error: err.message });
   }
 });
